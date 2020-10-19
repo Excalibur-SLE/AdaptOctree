@@ -1,29 +1,28 @@
-# Config file for automatic testing at travis-ci.com
+# Config file for automatic testing at travis-ci.org
 
 language: python
 python:
-  - 3.8
-  - 3.7
-  - 3.6
-  - 3.5
+  - "2.7"
+  - "3.6"
 
-# Command to install dependencies, e.g. pip install -r requirements.txt --use-mirrors
-install: pip install -U tox-travis
-
-# Command to run tests, e.g. python setup.py test
-script: tox
-
-# Assuming you have installed the travis-ci CLI tool, after you
-# create the Github repo and add it to Travis, run the
-# following command to finish PyPI deployment setup:
-# $ travis encrypt --add deploy.password
-deploy:
-  provider: pypi
-  distributions: sdist bdist_wheel
-  user: skailasa
-  password:
-    secure: PLEASE_REPLACE_ME
-  on:
-    tags: true
-    repo: skailasa/adaptoctree
-    python: 3.8
+install:
+  - if [[ "$TRAVIS_PYTHON_VERSION" == "2.7" ]]; then
+      wget https://repo.continuum.io/miniconda/Miniconda2-latest-Linux-x86_64.sh -O miniconda.sh;
+    else
+      wget https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh -O miniconda.sh;
+    fi
+  - bash miniconda.sh -b -p $HOME/miniconda
+  - export PATH="$HOME/miniconda/bin:$PATH"
+  - hash -r
+  - conda config --set always_yes yes
+  - conda update -q conda
+  - conda install conda-build anaconda-client pytest pytest-cov
+  - conda config --set auto_update_conda no
+  - conda build conda.recipe --no-test
+  - conda install --use-local adaptoctree
+  - conda info -a
+script:
+  - pytest -v --color=yes --cov=adaptoctree tests
+after_success:
+  - conda install -c conda-forge codecov
+  - codecov

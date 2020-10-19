@@ -1,53 +1,30 @@
-#!/usr/bin/env python
+from setuptools import setup
+import versioneer
 
-"""The setup script."""
-
-from setuptools import setup, find_packages
-
-with open('README.rst') as readme_file:
-    readme = readme_file.read()
-
-with open('HISTORY.rst') as history_file:
-    history = history_file.read()
-
-requirements = ['Click>=7.0', ]
-
-setup_requirements = ['pytest-runner', ]
-
-test_requirements = ['pytest>=3', ]
+requirements = [
+    # package requirements go here
+]
 
 setup(
+    name='AdaptOctree',
+    version=versioneer.get_version(),
+    cmdclass=versioneer.get_cmdclass(),
+    description="Adaptive octrees in Python.",
+    license="BSD",
     author="Srinath Kailasa",
     author_email='srinath.kailasa.18@ucl.ac.uk',
-    python_requires='>=3.5',
-    classifiers=[
-        'Development Status :: 2 - Pre-Alpha',
-        'Intended Audience :: Developers',
-        'License :: OSI Approved :: BSD License',
-        'Natural Language :: English',
-        'Programming Language :: Python :: 3',
-        'Programming Language :: Python :: 3.5',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
-        'Programming Language :: Python :: 3.8',
-    ],
-    description="Parallel Bottom Up Adaptive Octrees in Python",
+    url='https://github.com/skailasa/AdaptOctree',
+    packages=['adaptoctree'],
     entry_points={
         'console_scripts': [
-            'adaptoctree=adaptoctree.cli:main',
-        ],
+            'adaptoctree=adaptoctree.cli:cli'
+        ]
     },
     install_requires=requirements,
-    license="BSD license",
-    long_description=readme + '\n\n' + history,
-    include_package_data=True,
-    keywords='adaptoctree',
-    name='adaptoctree',
-    packages=find_packages(include=['adaptoctree', 'adaptoctree.*']),
-    setup_requires=setup_requirements,
-    test_suite='tests',
-    tests_require=test_requirements,
-    url='https://github.com/skailasa/adaptoctree',
-    version='0.0.0',
-    zip_safe=False,
+    keywords='AdaptOctree',
+    classifiers=[
+        'Programming Language :: Python :: 2.7',
+        'Programming Language :: Python :: 3.6',
+        'Programming Language :: Python :: 3.7',
+    ]
 )
