@@ -1,7 +1,0 @@
-[report]
-omit =
-    setup.py
-    adaptoctree/__main__.py
-    adaptoctree/_version.py
-    versioneer.py
-    tests/*
