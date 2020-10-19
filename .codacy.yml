@@ -1,0 +1,8 @@
+---
+exclude_paths:
+  - 'adaptoctree/_version.py'
+  - 'tests/**/*'
+  - 'tests/*'
+  - 'benchmarks/**/*'
+  - 'setup.py'
+  - 'versioneer.py'
