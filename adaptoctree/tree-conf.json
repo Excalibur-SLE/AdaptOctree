@@ -1,0 +1,6 @@
+{
+    "particle_filepath": "path/to/data",
+    "max_depth": 10,
+    "balance_order": 0,
+    "balance_constraint": 2
+}
