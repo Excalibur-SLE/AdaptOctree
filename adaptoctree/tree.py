@@ -1,5 +1,5 @@
 """
-Construct an adaptive octree form a set of points.
+Construct an adaptive linear octree form a set of points.
 """
 import numba
 import numpy as np
@@ -216,15 +216,21 @@ def get_keys_from_points(points, level, x0, r0):
 
 
 class Node:
-    def __init__(self, key, children=None):
+    def __init__(self, key, sources, targets, children=None):
+        self.key = key
+        self.sources = sources
+        self.targets = targets
         if children is not None:
             self.children = children
+
+    def __repr__(self):
+        return f"ID: {self.key}"
 
 
 
 def compute_nodes(sources, targets, level, x0, r0):
     """
-    Compute non-empty nodes at a given level, and return counter
+    Compute non-empty nodes at a given level, and return counter.
 
     Parameters:
     -----------
@@ -237,11 +243,72 @@ def compute_nodes(sources, targets, level, x0, r0):
     source_keys = get_keys_from_points(sources, level, x0, r0) # O(N)
     target_keys = get_keys_from_points(targets, level, x0, r0) # O(N)
 
+    values, counts = np.unique(source_keys, return_counts=True)
 
+
+def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
+
+    tree = []
+    built = False
+    level = 1
+
+    while not built:
+
+        if (level == maximum_level):
+            built = True
+
+        source_keys = get_keys_from_points(sources, level, x0, r0)
+        target_keys = get_keys_from_points(targets, level, x0, r0)
+
+        particle_keys = np.hstack((source_keys, target_keys))
+        particle_index_array = np.argsort(particle_keys)
+
+        values, counts = np.unique(particle_keys, return_counts=True) # O(N)
+
+        refined_sources = []
+        refined_targets = []
+
+        for i, count in enumerate(counts):
+            if count > maximum_particles:
+
+                source_idxs = np.where(source_keys == leaf)
+                target_idxs = np.where(target_keys == leaf)
+                refined_sources.append(sources[source_idxs])
+                refined_targets.append(targets[target_idxs])
+
+            else:
+                leaf = values[i]
+                source_idxs = np.where(source_keys == leaf)
+                target_idxs = np.where(target_keys == leaf)
+
+                tree.append(
+                    Node(
+                        key=values[i],
+                        sources=sources[source_idxs],
+                        targets=targets[target_idxs]
+                        )
+                    )
+
+        level += 1
+
+        if (not refined_sources) or (not refined_targets):
+            built = True
+
+        else:
+            sources = np.concatenate(refined_sources)
+            targets = np.concatenate(refined_targets)
+
+    return tree
+
+
+def plot_tree(tree):
+    pass
 
 
 def main():
-    n = 10
+    n = 20
+
+    np.random.seed(0)
     sources = np.random.rand(n, 3)
     targets = sources
     maximum_level = 5
@@ -252,12 +319,8 @@ def main():
     r0 = compute_radius(x0, max_bound, min_bound)
 
     # Sort sources and targets by octant at level 1 of octree
-    source_keys = get_keys_from_points(sources, level, x0, r0)
-    target_keys = get_keys_from_points(targets, level, x0, r0)
-    source_index_array = np.argsort(source_keys)
-    target_index_array = np.argsort(target_keys)
-
-    compute_nodes(sources, targets, 1, x0, r0)
+    tree = build_tree(sources, targets, maximum_level, 25, x0, r0)
+    print(tree)
 
 
 if __name__ == "__main__":
