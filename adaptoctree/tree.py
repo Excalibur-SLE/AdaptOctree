@@ -248,9 +248,9 @@ def compute_nodes(sources, targets, level, x0, r0):
 
 def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
 
-    tree = []
+    tree = [Node(0, sources, targets)]
     built = False
-    level = 1
+    level = 0
 
     while not built:
 
@@ -263,27 +263,26 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
         particle_keys = np.hstack((source_keys, target_keys))
         particle_index_array = np.argsort(particle_keys)
 
-        values, counts = np.unique(particle_keys, return_counts=True) # O(N)
+        unique_keys, counts = np.unique(particle_keys, return_counts=True) # O(N)
 
         refined_sources = []
         refined_targets = []
 
         for i, count in enumerate(counts):
+            leaf = unique_keys[i]
             if count > maximum_particles:
-
                 source_idxs = np.where(source_keys == leaf)
                 target_idxs = np.where(target_keys == leaf)
                 refined_sources.append(sources[source_idxs])
                 refined_targets.append(targets[target_idxs])
 
             else:
-                leaf = values[i]
                 source_idxs = np.where(source_keys == leaf)
                 target_idxs = np.where(target_keys == leaf)
 
                 tree.append(
                     Node(
-                        key=values[i],
+                        key=unique_keys[i],
                         sources=sources[source_idxs],
                         targets=targets[target_idxs]
                         )
@@ -301,12 +300,152 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
     return tree
 
 
-def plot_tree(tree):
-    pass
+
+@numba.njit(cache=True)
+def get_4d_index_from_key(key):
+    """
+    Compute the 4D index from a Hilbert key. The 4D index is composed as
+        [xidx, yidx, zidx, level], corresponding to the physical index of a node
+        in a partitioned box.
+    Parameters:
+    -----------
+    key : int
+        Hilbert key
+    Returns:
+    --------
+    index : np.array(shape=(4,), type=np.int64)
+    """
+    max_level = get_level(key)
+    key = key - get_level_offset(max_level)
+    index = np.zeros(4, np.int64)
+    index[3] = max_level
+    for level in range(max_level):
+        index[2] |= (key & (1 << 3 * level)) >> 2 * level
+        index[1] |= (key & (1 << 3 * level + 1)) >> (2 * level + 1)
+        index[0] |= (key & (1 << 3 * level + 2)) >> (2 * level + 2)
+    return index
+
+
+@numba.njit(cache=True)
+def get_center_from_4d_index(index, x0, r0):
+    """
+    Get center of given Octree node described by a 4d index.
+    Parameters:
+    -----------
+    index : np.array(shape=(4,), dtype=np.int64)
+        4D index.
+    x0 : np.array(shape=(3,))
+        Center of root node of Octree.
+    r0 : np.float64
+        Half width length of root node.
+    Returns:
+    --------
+    np.array(shape=(3,))
+    """
+    xmin = x0 - r0
+    level = index[-1]
+    side_length = 2 * r0 / (1 << level)
+    return (index[:3] + .5) * side_length + xmin
+
+
+@numba.njit(cache=True)
+def get_center_from_key(key, x0, r0):
+    """
+    Get (Cartesian) center of node from its Morton ID.
+    Parameters:
+    -----------
+    key : np.int64
+    x0 : np.array(shape=(3,))
+    r0 : np.float64
+    Returns:
+    --------
+    np.array(shape=(3,))
+    """
+    index = get_4d_index_from_key(key)
+    return get_center_from_4d_index(index, x0, r0)
+
+@numba.njit(cache=True)
+def get_level(key):
+    """
+    Get octree level from Morton ID.
+    Parameters:
+    -----------
+    key : int
+    Returns:
+    --------
+    int
+    """
+    level = -1
+    offset = 0
+    while key >= offset:
+        level += 1
+        offset += 1 << 3 * level
+    return level
+
+
+def compute_vertices(node, x0, r0):
+    """
+    vertices of node
+    """
+
+    center = get_center_from_key(node.key, x0, r0)
+    level = get_level(node.key)
+    radius = 2 * r0 / (1 << level)
+
+    vertices = np.empty(shape=(8, 3))
+    idx = 0
+    for i in [-1, 1]:
+        for j in [-1, 1]:
+            for k in [-1, 1]:
+                vertices[idx, :] = np.array([center[0]+i*radius, center[1]+j*radius, center[2]+k*radius])
+                idx += 1
+
+    return vertices
+
+
+def plot_tree(tree, x0, r0):
+    """
+
+    Parameters:
+    -----------
+    tree : [Node]
+    """
+
+    import itertools
+
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.mplot3d import Axes3D
+
+    points = []
+
+    fig = plt.figure()
+    ax = fig.add_subplot(111, projection='3d')
+
+    unique = []
+
+    for node in tree:
+        level = get_level(node.key)
+        radius = r0 / (1 << level)
+
+        center = get_center_from_key(node.key, x0, r0)
+
+        r = [-radius, radius]
+
+        for s, e in itertools.combinations(np.array(list(itertools.product(r, r, r))), 2):
+            if np.sum(np.abs(s-e)) == r[1]-r[0]:
+                ax.plot3D(*zip(s+center, e+center), color="b")
+
+    # Plot particle data
+    sources = tree[0].sources
+    ax.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
+    plt.show()
+
+
+
 
 
 def main():
-    n = 20
+    n = 150
 
     np.random.seed(0)
     sources = np.random.rand(n, 3)
@@ -319,8 +458,11 @@ def main():
     r0 = compute_radius(x0, max_bound, min_bound)
 
     # Sort sources and targets by octant at level 1 of octree
-    tree = build_tree(sources, targets, maximum_level, 25, x0, r0)
+    tree = build_tree(sources, targets, maximum_level, 100, x0, r0)
     print(tree)
+
+    plot_tree(tree, x0, r0)
+
 
 
 if __name__ == "__main__":
