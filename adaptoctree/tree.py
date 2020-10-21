@@ -441,9 +441,6 @@ def plot_tree(tree, x0, r0):
     plt.show()
 
 
-
-
-
 def main():
     n = 150
 
