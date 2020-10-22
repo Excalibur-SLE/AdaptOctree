@@ -6,6 +6,7 @@ import numpy as np
 
 import morton
 
+
 class Node:
     """
     Minimal octree node.
@@ -21,7 +22,33 @@ class Node:
         return f"<morton_id>{self.key}</morton_id>"
 
 
-def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
+def build_tree(
+    sources,
+    targets,
+    maximum_level,
+    maximum_particles,
+    ):
+    """
+    Top-down construction of an adaptive octre mesh.
+
+    Parameters:
+    -----------
+    sources : np.array(shape=(nsources, 3))
+    targets : np.array(shape=(nsources, 3))
+    maximum_level : np.int32
+        Maximum level of the octree.
+    maximum_particles : np.int32
+        Maximum number of particles per node.
+
+    Returns:
+    --------
+    [Node]
+        Adaptive linear Octree.
+    """
+
+    max_bound, min_bound = morton.find_bounds(sources, targets)
+    octree_center = morton.find_center(max_bound, min_bound)
+    octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     tree = [Node(0, sources, targets)]
     built = False
@@ -32,8 +59,8 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
         if (level == maximum_level):
             built = True
 
-        source_keys = morton.encode_points(sources, level, x0, r0)
-        target_keys = morton.encode_points(targets, level, x0, r0)
+        source_keys = morton.encode_points(sources, level, octree_center, octree_radius)
+        target_keys = morton.encode_points(targets, level, octree_center, octree_radius)
 
         particle_keys = np.hstack((source_keys, target_keys))
         particle_index_array = np.argsort(particle_keys)
@@ -75,7 +102,7 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
     return tree
 
 
-def plot_tree(tree, x0, r0):
+def plot_tree(tree, octree_center, octree_radius):
     """
 
     Parameters:
@@ -97,9 +124,9 @@ def plot_tree(tree, x0, r0):
 
     for node in tree:
         level = morton.find_level(node.key)
-        radius = r0 / (1 << level)
+        radius = octree_radius / (1 << level)
 
-        center = morton.find_center_from_key(node.key, x0, r0)
+        center = morton.find_center_from_key(node.key, octree_center, octree_radius)
 
         r = [-radius, radius]
 
@@ -114,21 +141,38 @@ def plot_tree(tree, x0, r0):
 
 
 def main():
-    n = 250
-    maximum_particles = 10
     np.random.seed(0)
-    sources = np.random.rand(n, 3)
-    targets = sources
-    maximum_level = 5
-    maximum_particles_per_node = 1
 
-    max_bound, min_bound = morton.find_bounds(sources, targets)
-    x0 = morton.find_center(max_bound, min_bound)
-    r0 = morton.find_radius(x0, max_bound, min_bound)
+    def make_moon(npoints):
+
+        x = np.linspace(0, 2*np.pi, npoints) + np.random.rand(npoints)
+        y = 0.5*np.ones(npoints) + np.random.rand(npoints)
+        z = np.sin(x) + np.random.rand(npoints)
+
+        moon = np.array([x, y, z]).T
+        print(moon.shape)
+        return moon
+
+    sources = targets = make_moon(250)
+
+    tree_conf = {
+        "sources": sources,
+        "targets": targets,
+        "maximum_level": 5,
+        "maximum_particles": 50
+    }
+
+
+
+
 
     # Sort sources and targets by octant at level 1 of octree
-    tree = build_tree(sources, targets, maximum_level, maximum_particles, x0, r0)
-    plot_tree(tree, x0, r0)
+    tree = build_tree(**tree_conf)
+
+    max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
+    octree_center = morton.find_center(max_bound, min_bound)
+    octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
+    plot_tree(tree, octree_center, octree_radius)
 
 
 if __name__ == "__main__":
