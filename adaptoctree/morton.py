@@ -1,43 +1,46 @@
 """
-Construct z order locational code to describe a set of points.
+Utility functions to construct Morton encodings from a set of points distributed
+in 3D.
 """
 import numba
 import numpy as np
 
 
+@numba.njit(cache=True)
+def find_center_from_anchor(anchor, x0, r0):
+    """
+    Get center of given Octree node from it's anchor
 
+    -----------
+    anchor : np.array(shape=(4,), dtype=np.int32)
+    x0 : np.array(shape=(3,))
+        Center of root node of Octree.
+    r0 : np.float64
+        Half width length of root node.
+    Returns:
+    --------
+    np.array(shape=(3,))
+    """
+
+    xmin = x0 - r0
+    level = anchor[-1]
+    side_length = 2 * r0 / (1 << level)
+
+    return (anchor[:3] + .5) * side_length + xmin
 
 
 @numba.njit(cache=True)
-def get_center_from_4d_index(index, x0, r0):
-    pass
-
-
-@numba.njit(cache=True)
-def get_center_from_key(key, x0, r0):
-    pass
+def find_center_from_key(key, x0, r0):
+    anchor = decode_key(key)
+    return find_center_from_anchor(anchor, x0, r0)
 
 
 @numba.njit(cache=True)
 def find_level(key):
-    pass
-
-
-@numba.njit(cache=True)
-def encode_points(points, level, x0, r0):
     """
+    Pop the last four bits, corresponding to key.
     """
-    npoints = len(points)
-    keys = np.empty(npoints, dtype=np.int64)
-    indices = np.empty((npoints, 4), dtype=np.int64)
-    indices[:, -1] = level
-    xmin = x0 - r0
-    side_length = 2 * r0 / (1 << level)
-    indices[:, :3] = np.floor((points - xmin) / side_length).astype(np.int32)
-
-    for i in range(npoints):
-        keys[i] = encode_anchor(indices[i, :])
-    return keys
+    return key & 0xF
 
 
 def find_bounds(sources, targets):
@@ -72,7 +75,7 @@ def find_radius(center, max_bound, min_bound):
 
 
 @numba.njit(cache=True)
-def find_anchor_from_point(point, level, x0, r0):
+def point_to_anchor(point, level, x0, r0):
     """
     """
     anchor = np.empty(4, dtype=np.int32)
@@ -86,62 +89,6 @@ def find_anchor_from_point(point, level, x0, r0):
     return anchor
 
 
-def encode_point(point, max_level, level, x0, r0):
-    """
-    """
-    anchor = find_anchor_from_point(point, level, x0, r0)
-    return morton_encode(anchor, max_level)
-
-
-def deinterleave(interleaved):
-    """
-    """
-    x = 0
-    y = 0
-    z = 0
-
-    i = 0
-
-    while interleaved > 0:
-        tmp = interleaved & 7
-        print(bin(interleaved), bin(tmp))
-
-        xi = tmp & 4
-        yi = tmp & 2
-        zi = tmp & 1
-
-        interleaved = interleaved >> 3
-
-    return np.array([xi, yi, zi])
-
-
-@numba.njit
-def interleave(x, y, z):
-    """
-    Interleave three 32-bit integers, bitwise.
-
-    Parameters:
-    -----------
-    x : np.int32
-    y : np.int32
-    z : np.int32
-
-    Returns:
-    --------
-    interleaved : np.int64
-    """
-    interleaved = np.int64(0)
-    for i in range(32):
-        xi = x & (1 << i)
-        yi = y & (1 << i)
-        zi = z & (1 << i)
-
-        interleaved |= xi << (i+2)
-        interleaved |= yi << (i+1)
-        interleaved |= zi << i
-    return interleaved
-
-
 @numba.njit
 def encode_anchor(anchor):
     """
@@ -152,7 +99,7 @@ def encode_anchor(anchor):
         """
         Insert two 0 bits after each of the 10 low bits of x using magic numbers.
         """
-        x &= 0x000003ff;                  # x = ---- ---- ---- ---- ---- --98 7654 3210
+        x &= 0x000003ff;                 # x = ---- ---- ---- ---- ---- --98 7654 3210
         x = (x ^ (x << 16)) & 0xff0000ff # x = ---- --98 ---- ---- ---- ---- 7654 3210
         x = (x ^ (x <<  8)) & 0x0300f00f # x = ---- --98 ---- ---- 7654 ---- ---- 3210
         x = (x ^ (x <<  4)) & 0x030c30c3 # x = ---- --98 ---- 76-- --54 ---- 32-- --10
@@ -163,34 +110,37 @@ def encode_anchor(anchor):
     # Interleave bits
     key = (split(anchor[0]) << 2) + (split(anchor[1]) << 1) + (split(anchor[2]))
 
-    # Append level
+    # Append level to final 4 bits
     key = key << 4
-    key = key | (anchor[3])
+    key = key | anchor[3]
 
     return key
 
+
 @numba.njit
 def decode_key(key):
-
+    """
+    Decode Morton key, to anchor point.
+    """
     def remove_level(key):
         return key >> 4
 
-    def get_level(key):
-        level = key & (15)
+    def find_level(key):
+        level = key & 0xF
         return level
 
     def compact(key):
-        # Remove level
         key = remove_level(key)
 
-        key &= 0x09249249                  # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+        key &= 0x09249249                      # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
         key = (key ^ (key >>  2)) & 0x030c30c3 # x = ---- --98 ---- 76-- --54 ---- 32-- --10
         key = (key ^ (key >>  4)) & 0x0300f00f # x = ---- --98 ---- ---- 7654 ---- ---- 3210
         key = (key ^ (key >>  8)) & 0xff0000ff # x = ---- --98 ---- ---- ---- ---- 7654 3210
         key = (key ^ (key >> 16)) & 0x000003ff # x = ---- ---- ---- ---- ---- --98 7654 3210
+
         return key
 
-    level = get_level(key)
+    level = find_level(key)
     x = compact(key >> 2)
     y = compact(key >> 1)
     z = compact(key)
@@ -199,6 +149,33 @@ def decode_key(key):
 
     return anchor
 
+
+def encode_point(point, max_level, level, x0, r0):
+    """
+    """
+    anchor = point_to_anchor(point, level, x0, r0)
+    return encode_anchor(anchor)
+
+
+@numba.njit(cache=True)
+def encode_points(points, level, x0, r0):
+    """
+    """
+    npoints = len(points)
+    keys = np.empty(npoints, dtype=np.int64)
+
+    anchors = np.empty((npoints, 4), dtype=np.int32)
+    anchors[:, -1] = level
+
+    xmin = x0 - r0
+    diameter = 2 * r0 / (1 << level)
+
+    anchors[:, :3] = np.floor((points - xmin) / diameter).astype(np.int32)
+
+    for i in range(npoints):
+        keys[i] = encode_anchor(anchors[i, :])
+
+    return keys
 
 if __name__ == "__main__":
     anchor = [1, 13, 1, 2]

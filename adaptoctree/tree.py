@@ -4,8 +4,12 @@ Construct an adaptive linear octree form a set of points.
 import numba
 import numpy as np
 
+import morton
 
 class Node:
+    """
+    Minimal octree node.
+    """
     def __init__(self, key, sources, targets, children=None):
         self.key = key
         self.sources = sources
@@ -14,25 +18,7 @@ class Node:
             self.children = children
 
     def __repr__(self):
-        return f"ID: {self.key}"
-
-
-def compute_nodes(sources, targets, level, x0, r0):
-    """
-    Compute non-empty nodes at a given level, and return counter.
-
-    Parameters:
-    -----------
-    sources : np.array(shape=(nsources, 3))
-        Sorted by morton id at previous level
-    targets : np.array(shape=(ntargets, 3))
-        sorted by morton id at previous level
-    """
-
-    source_keys = get_keys_from_points(sources, level, x0, r0) # O(N)
-    target_keys = get_keys_from_points(targets, level, x0, r0) # O(N)
-
-    values, counts = np.unique(source_keys, return_counts=True)
+        return f"<morton_id>{self.key}</morton_id>"
 
 
 def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
@@ -46,8 +32,8 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
         if (level == maximum_level):
             built = True
 
-        source_keys = get_keys_from_points(sources, level, x0, r0)
-        target_keys = get_keys_from_points(targets, level, x0, r0)
+        source_keys = morton.encode_points(sources, level, x0, r0)
+        target_keys = morton.encode_points(targets, level, x0, r0)
 
         particle_keys = np.hstack((source_keys, target_keys))
         particle_index_array = np.argsort(particle_keys)
@@ -89,26 +75,6 @@ def build_tree(sources, targets, maximum_level, maximum_particles, x0, r0):
     return tree
 
 
-def compute_vertices(node, x0, r0):
-    """
-    vertices of node
-    """
-
-    center = get_center_from_key(node.key, x0, r0)
-    level = get_level(node.key)
-    radius = 2 * r0 / (1 << level)
-
-    vertices = np.empty(shape=(8, 3))
-    idx = 0
-    for i in [-1, 1]:
-        for j in [-1, 1]:
-            for k in [-1, 1]:
-                vertices[idx, :] = np.array([center[0]+i*radius, center[1]+j*radius, center[2]+k*radius])
-                idx += 1
-
-    return vertices
-
-
 def plot_tree(tree, x0, r0):
     """
 
@@ -130,10 +96,10 @@ def plot_tree(tree, x0, r0):
     unique = []
 
     for node in tree:
-        level = get_level(node.key)
+        level = morton.find_level(node.key)
         radius = r0 / (1 << level)
 
-        center = get_center_from_key(node.key, x0, r0)
+        center = morton.find_center_from_key(node.key, x0, r0)
 
         r = [-radius, radius]
 
@@ -156,9 +122,9 @@ def main():
     maximum_level = 5
     maximum_particles_per_node = 1
 
-    max_bound, min_bound = compute_bounds(sources, targets)
-    x0 = compute_center(max_bound, min_bound)
-    r0 = compute_radius(x0, max_bound, min_bound)
+    max_bound, min_bound = morton.find_bounds(sources, targets)
+    x0 = morton.find_center(max_bound, min_bound)
+    r0 = morton.find_radius(x0, max_bound, min_bound)
 
     # Sort sources and targets by octant at level 1 of octree
     tree = build_tree(sources, targets, maximum_level, maximum_particles, x0, r0)
