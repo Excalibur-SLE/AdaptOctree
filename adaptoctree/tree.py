@@ -442,8 +442,8 @@ def plot_tree(tree, x0, r0):
 
 
 def main():
-    n = 150
-
+    n = 250
+    maximum_particles = 10
     np.random.seed(0)
     sources = np.random.rand(n, 3)
     targets = sources
@@ -455,11 +455,8 @@ def main():
     r0 = compute_radius(x0, max_bound, min_bound)
 
     # Sort sources and targets by octant at level 1 of octree
-    tree = build_tree(sources, targets, maximum_level, 100, x0, r0)
-    print(tree)
-
+    tree = build_tree(sources, targets, maximum_level, maximum_particles, x0, r0)
     plot_tree(tree, x0, r0)
-
 
 
 if __name__ == "__main__":
