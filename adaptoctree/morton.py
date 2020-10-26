@@ -2,6 +2,8 @@
 Utility functions to construct Morton encodings from a set of points distributed
 in 3D.
 """
+import sys
+
 import numba
 import numpy as np
 
@@ -87,6 +89,19 @@ def point_to_anchor(point, level, x0, r0):
     anchor[:3] = np.floor((point - xmin) / side_length).astype(np.int32)
 
     return anchor
+
+
+def encode_anchor_lut(anchor):
+    """
+    Apply Morton encoding using lookup table
+    """
+
+    key = 0
+    x = anchor[0]
+
+    i = sys.sizeof(x)
+
+    return key
 
 
 @numba.njit
@@ -176,6 +191,7 @@ def encode_points(points, level, x0, r0):
         keys[i] = encode_anchor(anchors[i, :])
 
     return keys
+
 
 if __name__ == "__main__":
     anchor = [1, 13, 1, 2]

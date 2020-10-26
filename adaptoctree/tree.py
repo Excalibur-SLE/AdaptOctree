@@ -150,7 +150,6 @@ def main():
         z = np.sin(x) + np.random.rand(npoints)
 
         moon = np.array([x, y, z]).T
-        print(moon.shape)
         return moon
 
     sources = targets = make_moon(250)
@@ -161,10 +160,6 @@ def main():
         "maximum_level": 5,
         "maximum_particles": 50
     }
-
-
-
-
 
     # Sort sources and targets by octant at level 1 of octree
     tree = build_tree(**tree_conf)
