@@ -7,6 +7,12 @@ import sys
 import numba
 import numpy as np
 
+from morton_lookup import (
+    X_LOOKUP, Y_LOOKUP, Z_LOOKUP,
+    EIGHT_BIT_MASK, TWENTY_FOUR_BIT_MASK
+    )
+
+
 
 @numba.njit(cache=True)
 def find_center_from_anchor(anchor, x0, r0):
@@ -91,76 +97,116 @@ def point_to_anchor(point, level, x0, r0):
     return anchor
 
 
-def encode_anchor_lut(anchor):
+@numba.njit(cache=True)
+def encode_anchor(anchor):
     """
-    Apply Morton encoding using lookup table
+    Apply Morton encoding to a 3D anchor using a lookup table. Assume 64 bit key,
+    with 60 bits for key, and 4 bits reserved for level. At most 20 bits for
+    each anchor coordinate, stored in a 32 bit integer.
+
+    Parameters:
+    -----------
+    anchor : np.array(shape=(4,), dtype=np.int32)
+
+    Returns:
+    --------
+    np.int64
     """
 
     key = 0
+
+    # Get least significant bits of all coordinate values
     x = anchor[0]
+    y = anchor[1]
+    z = anchor[2]
 
-    i = sys.sizeof(x)
+    level = anchor[3]
 
-    return key
+    mask = EIGHT_BIT_MASK
 
+    while mask > 0:
 
-@numba.njit
-def encode_anchor(anchor):
-    """
-    Apply Morton encoding
-    """
+        # Shift up key
+        key = key << 8
 
-    def split(x):
-        """
-        Insert two 0 bits after each of the 10 low bits of x using magic numbers.
-        """
-        x &= 0x000003ff;                 # x = ---- ---- ---- ---- ---- --98 7654 3210
-        x = (x ^ (x << 16)) & 0xff0000ff # x = ---- --98 ---- ---- ---- ---- 7654 3210
-        x = (x ^ (x <<  8)) & 0x0300f00f # x = ---- --98 ---- ---- 7654 ---- ---- 3210
-        x = (x ^ (x <<  4)) & 0x030c30c3 # x = ---- --98 ---- 76-- --54 ---- 32-- --10
-        x = (x ^ (x <<  2)) & 0x09249249 # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
+        x_most_bits = x & mask
+        y_most_bits = y & mask
+        z_most_bits = z & mask
 
-        return x
+        # print("here", [bin(x) for x in [x_most_bits, y_most_bits, z_most_bits]])
+        # print("mask", bin(mask))
 
-    # Interleave bits
-    key = (split(anchor[0]) << 2) + (split(anchor[1]) << 1) + (split(anchor[2]))
+        # Find splitting
+        x_split = X_LOOKUP[x_most_bits]
+        y_split = Y_LOOKUP[y_most_bits]
+        z_split = Z_LOOKUP[z_most_bits]
 
-    # Append level to final 4 bits
-    key = key << 4
+        # Merge split x, y and z
+        merged = x_split | y_split | z_split
+
+        # Add to key
+        key = key | merged
+
+        # Shift mask down
+        mask = mask >> 0x8
+
+    # Append level
+    key = key << 0x4
     key = key | anchor[3]
 
     return key
 
 
-@numba.njit
+@numba.njit(cache=True)
 def decode_key(key):
     """
-    Decode Morton key, to anchor point.
+    Decode a 3D Morton key using lookup tables, assume 64 bit keys.
+
+    Parameters:
+    -----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.array(shape=(4,), dtype=np.int32)
     """
-    def remove_level(key):
-        return key >> 4
 
-    def find_level(key):
-        level = key & 0xF
-        return level
+    # Get level
+    level = key & 0xf
 
-    def compact(key):
-        key = remove_level(key)
+    # Remove level
+    key = key >> 0x4
 
-        key &= 0x09249249                      # x = ---- 9--8 --7- -6-- 5--4 --3- -2-- 1--0
-        key = (key ^ (key >>  2)) & 0x030c30c3 # x = ---- --98 ---- 76-- --54 ---- 32-- --10
-        key = (key ^ (key >>  4)) & 0x0300f00f # x = ---- --98 ---- ---- 7654 ---- ---- 3210
-        key = (key ^ (key >>  8)) & 0xff0000ff # x = ---- --98 ---- ---- ---- ---- 7654 3210
-        key = (key ^ (key >> 16)) & 0x000003ff # x = ---- ---- ---- ---- ---- --98 7654 3210
+    x = y = z = 0
 
-        return key
+    mask = TWENTY_FOUR_BIT_MASK
 
-    level = find_level(key)
-    x = compact(key >> 2)
-    y = compact(key >> 1)
-    z = compact(key)
+    x_mask = X_LOOKUP[-1]
+    y_mask = Y_LOOKUP[-1]
+    z_mask = Z_LOOKUP[-1]
 
-    anchor = np.array([x, y, z, level])
+    while mask > 0:
+
+        # Find most significant 24 bits while they exist
+        most_significant_bits = mask & key
+
+        # Extract bits for coords
+        x_split = x_mask & most_significant_bits
+        y_split = y_mask & most_significant_bits
+        z_split = z_mask & most_significant_bits
+
+        x = x << 0x8
+        x = x | (np.int32(np.where(X_LOOKUP == x_split)[0][0]))
+
+        y = y << 0x8
+        y = y | (np.int32(np.where(Y_LOOKUP == y_split)[0][0]))
+
+        z = z << 0x8
+        z = z | (np.int32(np.where(Z_LOOKUP == z_split)[0][0]))
+
+        mask = mask >> 0x18
+
+    anchor = np.array([x, y, z, level], dtype=np.int32)
 
     return anchor
 
@@ -194,7 +240,7 @@ def encode_points(points, level, x0, r0):
 
 
 if __name__ == "__main__":
-    anchor = [1, 13, 1, 2]
+    anchor = np.array([1, 1, 1, 2], dtype=np.int32)
     print([bin(i) for i in anchor])
     print(encode_anchor(anchor))
     key = encode_anchor(anchor)

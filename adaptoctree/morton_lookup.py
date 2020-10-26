@@ -4,7 +4,8 @@ Lookup tables for Morton encoding
 import numpy as np
 
 
-EIGHT_BIT_MASK = 0xff
+EIGHT_BIT_MASK = 0xff000000
+TWENTY_FOUR_BIT_MASK = 0xFFFFFF000000
 
 
 X_LOOKUP = np.array([
@@ -113,9 +114,3 @@ Z_LOOKUP = np.array([
     0x00924000, 0x00924004, 0x00924020, 0x00924024, 0x00924100, 0x00924104, 0x00924120, 0x00924124,
     0x00924800, 0x00924804, 0x00924820, 0x00924824, 0x00924900, 0x00924904, 0x00924920, 0x00924924
     ], dtype=np.int32)
-
-
-if __name__ == "__main__":
-
-    print(bin(255))
-    print(bin(Z_LOOKUP[255]))
