@@ -8,10 +8,11 @@ import numba
 import numpy as np
 
 from morton_lookup import (
-    X_LOOKUP, Y_LOOKUP, Z_LOOKUP,
+    X_LOOKUP,
+    Y_LOOKUP,
+    Z_LOOKUP,
     EIGHT_BIT_MASK, TWENTY_FOUR_BIT_MASK
     )
-
 
 
 @numba.njit(cache=True)
@@ -185,6 +186,19 @@ def decode_key(key):
     y_mask = Y_LOOKUP[-1]
     z_mask = Z_LOOKUP[-1]
 
+
+    def extract(split):
+        mask = 0x1
+        extracted = 0
+        i = 0
+
+        while split > 0:
+            extracted |= ((mask & split) << i)
+            split = split >> 3
+            i += 1
+
+        return extracted
+
     while mask > 0:
 
         # Find most significant 24 bits while they exist
@@ -195,14 +209,15 @@ def decode_key(key):
         y_split = y_mask & most_significant_bits
         z_split = z_mask & most_significant_bits
 
+        # Remove splitting
         x = x << 0x8
-        x = x | (np.int32(np.where(X_LOOKUP == x_split)[0][0]))
+        x = x | extract(x_split)
 
         y = y << 0x8
-        y = y | (np.int32(np.where(Y_LOOKUP == y_split)[0][0]))
+        y = y | extract(y_split >> 1)
 
         z = z << 0x8
-        z = z | (np.int32(np.where(Z_LOOKUP == z_split)[0][0]))
+        z = z | extract(z_split >> 2)
 
         mask = mask >> 0x18
 
@@ -240,11 +255,10 @@ def encode_points(points, level, x0, r0):
 
 
 if __name__ == "__main__":
-    anchor = np.array([1, 1, 1, 2], dtype=np.int32)
+    anchor = np.array([14, 11, 3, 4], dtype=np.int32)
     print([bin(i) for i in anchor])
+    print()
     print(encode_anchor(anchor))
     key = encode_anchor(anchor)
-    print(str(bin(key)))
-    print(key)
-    print()
+    print(bin(key))
     print(decode_key(key))

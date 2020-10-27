@@ -3,7 +3,6 @@ Lookup tables for Morton encoding
 """
 import numpy as np
 
-
 EIGHT_BIT_MASK = 0xff000000
 TWENTY_FOUR_BIT_MASK = 0xFFFFFF000000
 
