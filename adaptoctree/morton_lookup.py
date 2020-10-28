@@ -3,9 +3,6 @@ Lookup tables for Morton encoding
 """
 import numpy as np
 
-EIGHT_BIT_MASK = 0xff000000
-TWENTY_FOUR_BIT_MASK = 0xFFFFFF000000
-
 
 X_LOOKUP = np.array([
     0x00000000, 0x00000001, 0x00000008, 0x00000009, 0x00000040, 0x00000041, 0x00000048, 0x00000049,

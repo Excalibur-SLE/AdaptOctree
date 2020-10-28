@@ -11,7 +11,6 @@ from morton_lookup import (
     X_LOOKUP,
     Y_LOOKUP,
     Z_LOOKUP,
-    EIGHT_BIT_MASK, TWENTY_FOUR_BIT_MASK
     )
 
 
@@ -108,11 +107,12 @@ def encode_point(point, max_level, level, x0, r0):
 @numba.njit(cache=True)
 def encode_points(points, level, x0, r0):
     """
+    Apply morton encoding to a set of points, by first finding out which
     """
     npoints = len(points)
     keys = np.empty(npoints, dtype=np.int64)
 
-    anchors = np.empty((npoints, 4), dtype=np.int32)
+    anchors = np.empty((npoints, 4), dtype=np.int16)
     anchors[:, -1] = level
 
     xmin = x0 - r0
@@ -126,8 +126,22 @@ def encode_points(points, level, x0, r0):
     return keys
 
 
+@numba.njit
 def encode_anchor(anchor):
-    """16 bit anchor coordinates, 12 bit level
+    """
+    Morton encode a set of anchor coordinates and their octree level. Assume a
+        maximum of 16 bits for each anchor coordinate, and 12 bits for level.
+        Strategy is to examine byte by byte, from most to least significant
+        bytes, and find interleaving using the lookup table. Finally, level
+        information is appended to the tail.
+
+    Parameters:
+    -----------
+    anchor : np.array(shape=(4,), dtype=np.int16)
+
+    Returns:
+    --------
+    key : np.int64
     """
     x = anchor[0]
     y = anchor[1]
@@ -136,16 +150,33 @@ def encode_anchor(anchor):
 
     key = 0
 
-    # Start with 2nd byte
+    # Find interleaving
     key = Z_LOOKUP[(z >> 8) & 0xff] | Y_LOOKUP[(y >> 8) & 0xff] | X_LOOKUP[(x >> 8) & 0xff]
     key = (key << 24) | Z_LOOKUP[z & 0xff] | Y_LOOKUP[y & 0xff] | X_LOOKUP[x & 0xff]
+
+    # Append level
     key = key << 16
     key = key | level
+
     return key
 
 
+@numba.njit
 def decode_key(key):
+    """
+    Decode a Morton encoded key, return an anchor. The strategy is to examine
+    the 64 bit key 3 bytes at a time, and extract 8 of the x, y and z bits
+    from this chunk of 3 bytes. This chunking is iterative, and will therefore
+    be significantly slower than the lookup based encoding.
 
+    Paramters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.array(shape=(4,), np.int16)
+    """
     x = 0
     y = 0
     z = 0
@@ -160,7 +191,6 @@ def decode_key(key):
             ans = ans | ((x & 1) << i)
             i += 1
             x = x >> 3
-
         return ans
 
     x = extract(key)
@@ -174,14 +204,3 @@ def decode_key(key):
 
     anchor = np.array([x, y, z, level], dtype=np.int16)
     return anchor
-
-
-if __name__ == "__main__":
-    anchor = np.array([1, 1, 1, 1], dtype=np.int32)
-    print([bin(i) for i in anchor])
-    print()
-    key = encode_anchor(anchor)
-    print(bin(key), 'key', key)
-    anchor = decode_key(key)
-    print(anchor)
-    # print(decode_key(key))
