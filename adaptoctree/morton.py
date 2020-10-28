@@ -98,134 +98,6 @@ def point_to_anchor(point, level, x0, r0):
     return anchor
 
 
-@numba.njit(cache=True)
-def encode_anchor(anchor):
-    """
-    Apply Morton encoding to a 3D anchor using a lookup table. Assume 64 bit key,
-    with 60 bits for key, and 4 bits reserved for level. At most 20 bits for
-    each anchor coordinate, stored in a 32 bit integer.
-
-    Parameters:
-    -----------
-    anchor : np.array(shape=(4,), dtype=np.int32)
-
-    Returns:
-    --------
-    np.int64
-    """
-
-    key = 0
-
-    # Get least significant bits of all coordinate values
-    x = anchor[0]
-    y = anchor[1]
-    z = anchor[2]
-
-    level = anchor[3]
-
-    mask = EIGHT_BIT_MASK
-
-    while mask > 0:
-
-        # Shift up key
-        key = key << 8
-
-        x_most_bits = x & mask
-        y_most_bits = y & mask
-        z_most_bits = z & mask
-
-        # print("here", [bin(x) for x in [x_most_bits, y_most_bits, z_most_bits]])
-        # print("mask", bin(mask))
-
-        # Find splitting
-        x_split = X_LOOKUP[x_most_bits]
-        y_split = Y_LOOKUP[y_most_bits]
-        z_split = Z_LOOKUP[z_most_bits]
-
-        # Merge split x, y and z
-        merged = x_split | y_split | z_split
-
-        # Add to key
-        key = key | merged
-
-        # Shift mask down
-        mask = mask >> 0x8
-
-    # Append level
-    key = key << 0x4
-    key = key | anchor[3]
-
-    return key
-
-
-@numba.njit(cache=True)
-def decode_key(key):
-    """
-    Decode a 3D Morton key using lookup tables, assume 64 bit keys.
-
-    Parameters:
-    -----------
-    key : np.int64
-
-    Returns:
-    --------
-    np.array(shape=(4,), dtype=np.int32)
-    """
-
-    # Get level
-    level = key & 0xf
-
-    # Remove level
-    key = key >> 0x4
-
-    x = y = z = 0
-
-    mask = TWENTY_FOUR_BIT_MASK
-
-    x_mask = X_LOOKUP[-1]
-    y_mask = Y_LOOKUP[-1]
-    z_mask = Z_LOOKUP[-1]
-
-
-    def extract(split):
-        mask = 0x1
-        extracted = 0
-        i = 0
-
-        while split > 0:
-            extracted |= ((mask & split) << i)
-            split = split >> 3
-            i += 1
-
-        return extracted
-
-    while mask > 0:
-
-        # Find most significant 24 bits while they exist
-        most_significant_bits = mask & key
-
-        # Extract bits for coords
-        x_split = x_mask & most_significant_bits
-        y_split = y_mask & most_significant_bits
-        z_split = z_mask & most_significant_bits
-
-        # Remove splitting
-        x = x << 0x8
-        x = x | extract(x_split)
-
-        y = y << 0x8
-        y = y | extract(y_split >> 1)
-
-        z = z << 0x8
-        z = z | extract(z_split >> 2)
-
-        mask = mask >> 0x18
-
-    anchor = np.array([x, y, z, level], dtype=np.int32)
-
-    return anchor
-
-
 def encode_point(point, max_level, level, x0, r0):
     """
     """
@@ -254,11 +126,62 @@ def encode_points(points, level, x0, r0):
     return keys
 
 
+def encode_anchor(anchor):
+    """16 bit anchor coordinates, 12 bit level
+    """
+    x = anchor[0]
+    y = anchor[1]
+    z = anchor[2]
+    level = anchor[3]
+
+    key = 0
+
+    # Start with 2nd byte
+    key = Z_LOOKUP[(z >> 8) & 0xff] | Y_LOOKUP[(y >> 8) & 0xff] | X_LOOKUP[(x >> 8) & 0xff]
+    key = (key << 24) | Z_LOOKUP[z & 0xff] | Y_LOOKUP[y & 0xff] | X_LOOKUP[x & 0xff]
+    key = key << 16
+    key = key | level
+    return key
+
+
+def decode_key(key):
+
+    x = 0
+    y = 0
+    z = 0
+    level = key & 0xffff
+    key = key >> 16
+
+    def extract(x):
+        """extract every third bit from 24 bit integer"""
+        ans = 0
+        i = 0
+        while x > 0:
+            ans = ans | ((x & 1) << i)
+            i += 1
+            x = x >> 3
+
+        return ans
+
+    x = extract(key)
+    x =  x | (extract((key >> 24)) << 8)
+
+    y = extract(key >> 1)
+    y = y | (extract((key >> 25)) << 8)
+
+    z = extract(key >> 2)
+    z = z | (extract((key >> 26)) << 8)
+
+    anchor = np.array([x, y, z, level], dtype=np.int16)
+    return anchor
+
+
 if __name__ == "__main__":
-    anchor = np.array([14, 11, 3, 4], dtype=np.int32)
+    anchor = np.array([1, 1, 1, 1], dtype=np.int32)
     print([bin(i) for i in anchor])
     print()
-    print(encode_anchor(anchor))
     key = encode_anchor(anchor)
-    print(bin(key))
-    print(decode_key(key))
+    print(bin(key), 'key', key)
+    anchor = decode_key(key)
+    print(anchor)
+    # print(decode_key(key))
