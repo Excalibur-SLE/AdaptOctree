@@ -4,7 +4,7 @@ Construct an adaptive linear octree form a set of points.
 import numba
 import numpy as np
 
-import morton
+import adaptoctree.morton as morton
 
 
 class Node:
@@ -22,6 +22,33 @@ class Node:
         return f"<morton_id>{self.key}</morton_id>"
 
 
+class Octree:
+    """Minimal, list-like, octree"""
+
+    def __init__(self, sources, targets, maximum_level, maximum_particles):
+
+        self.tree, self.depth, self.size = build_tree(
+            sources=sources,
+            targets=targets,
+            maximum_level=maximum_level,
+            maximum_particles=maximum_particles
+            )
+
+        self.maximum_level = maximum_level
+
+    def __repr__(self):
+        return f"<tree>" \
+               f"<maximum_level>{self.maximum_level}</maximum_level>" \
+               f"<depth>{self.depth}</depth>"\
+               f"</tree>"
+
+    def __getitem__(self, key):
+        return self.tree[key]
+
+    def __setitem__(self, key, value):
+        self.tree[key] = value
+
+
 def build_tree(
     sources,
     targets,
@@ -29,7 +56,7 @@ def build_tree(
     maximum_particles,
     ):
     """
-    Top-down construction of an adaptive octre mesh.
+    Top-down construction of an adaptive octree mesh.
 
     Parameters:
     -----------
@@ -52,12 +79,18 @@ def build_tree(
 
     tree = [Node(0, sources, targets)]
     built = False
-    level = 0
+    level = -1
+
+    min_key = max_key = tree[0].key
+
+    size = 1
 
     while not built:
+        level += 1
 
         if (level == maximum_level):
             built = True
+
 
         # Heavy lifting
         source_keys = morton.encode_points(sources, level, octree_center, octree_radius)
@@ -82,15 +115,17 @@ def build_tree(
                 source_idxs = np.where(source_keys == leaf)
                 target_idxs = np.where(target_keys == leaf)
 
-                tree.append(
-                    Node(
-                        key=unique_keys[i],
-                        sources=sources[source_idxs],
-                        targets=targets[target_idxs]
-                        )
-                    )
+                if unique_keys[i] >= max_key:
 
-        level += 1
+                    tree.append(
+                        Node(
+                            key=unique_keys[i],
+                            sources=sources[source_idxs],
+                            targets=targets[target_idxs]
+                            )
+                        )
+
+                    size += 1
 
         if (not refined_sources) or (not refined_targets):
             built = True
@@ -99,4 +134,4 @@ def build_tree(
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
 
-    return tree
+    return tree, level, size

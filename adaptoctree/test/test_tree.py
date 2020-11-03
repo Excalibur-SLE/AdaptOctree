@@ -6,8 +6,10 @@ import time
 
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
+import numpy as np
 
 from adaptoctree.tree import build_tree
+import adaptoctree.morton as morton
 
 
 def plot_tree(tree, octree_center, octree_radius):
@@ -26,6 +28,7 @@ def plot_tree(tree, octree_center, octree_radius):
     unique = []
 
     for node in tree:
+        print('here', tree)
         level = morton.find_level(node.key)
         radius = octree_radius / (1 << level)
 
@@ -56,20 +59,20 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(1000)
+    N = int(100)
     # sources = targets = make_moon(N)
     sources = targets = np.random.rand(N, 3)
 
     tree_conf = {
         "sources": sources,
         "targets": targets,
-        "maximum_level": 5,
+        "maximum_level": 1,
         "maximum_particles": 50
     }
 
     # Sort sources and targets by octant at level 1 of octree
     start = time.time()
-    tree = build_tree(**tree_conf)
+    tree, depth, size = build_tree(**tree_conf)
     print(f"initial run: {time.time() - start}")
 
     max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
@@ -77,6 +80,7 @@ def main():
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
     plot_tree(tree, octree_center, octree_radius)
 
+    print(f"tree {tree}")
 
 if __name__ == "__main__":
     main()

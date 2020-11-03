@@ -7,7 +7,7 @@ import sys
 import numba
 import numpy as np
 
-from morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
+from adaptoctree.morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
 
 
 @numba.njit(cache=True)
