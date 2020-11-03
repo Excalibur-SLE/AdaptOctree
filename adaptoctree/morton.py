@@ -7,11 +7,7 @@ import sys
 import numba
 import numpy as np
 
-from morton_lookup import (
-    X_LOOKUP,
-    Y_LOOKUP,
-    Z_LOOKUP,
-    )
+from morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
 
 
 @numba.njit(cache=True)
@@ -46,9 +42,9 @@ def find_center_from_key(key, x0, r0):
 @numba.njit(cache=True)
 def find_level(key):
     """
-    Pop the last four bits, corresponding to key.
+    Find the last 16 bits of a key, corresponding to a level.
     """
-    return key & 0xF
+    return key & 0xffff
 
 
 def find_bounds(sources, targets):
