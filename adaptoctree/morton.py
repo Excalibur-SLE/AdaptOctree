@@ -2,8 +2,6 @@
 Utility functions to construct Morton encodings from a set of points distributed
 in 3D.
 """
-import sys
-
 import numba
 import numpy as np
 
@@ -93,6 +91,7 @@ def point_to_anchor(point, level, x0, r0):
     return anchor
 
 
+@numba.njit(cache=True)
 def encode_point(point, max_level, level, x0, r0):
     """
     """
@@ -126,7 +125,7 @@ def encode_points(points, level, x0, r0):
 def encode_anchor(anchor):
     """
     Morton encode a set of anchor coordinates and their octree level. Assume a
-        maximum of 16 bits for each anchor coordinate, and 12 bits for level.
+        maximum of 16 bits for each anchor coordinate, and 16 bits for level.
         Strategy is to examine byte by byte, from most to least significant
         bytes, and find interleaving using the lookup table. Finally, level
         information is appended to the tail.
@@ -155,7 +154,6 @@ def encode_anchor(anchor):
     key = key | level
 
     return key
-
 
 @numba.njit
 def decode_key(key):
@@ -200,3 +198,47 @@ def decode_key(key):
 
     anchor = np.array([x, y, z, level], dtype=np.int16)
     return anchor
+
+
+# Neighbours for key 000 (binary)
+
+NEIGHBOURS = [
+    4, 2, 1, # Face neighbours
+    6, 5, 3, # Edge neighbours
+    7        # corner neighbours
+]
+
+
+def find_coarsest_neighbours(key):
+    """
+    Compute coarses possible neighbors of a given key done with bitwise
+        operations.
+
+    Parameters:
+    -----------
+    key : int
+        Morton key
+    """
+
+    print('before', bin(key))
+
+    level = find_level(key)
+
+    # Maximum box index at a given level [0, 2^level)
+    max_index = 2**level - 1
+
+    # Remove level bits
+    key = key >> 16
+
+    # Get to coarsest level bits that preserve 2:1 property, i.e. one level up
+    key = key >> 3
+
+    neighbors = []
+
+    shifts = []
+
+    # Coarsest possible neighbours identifiable through allowed bit-flips of
+    # coarsest possible bits in Morton encoding.
+    print('after', bin(key))
+
+    pass

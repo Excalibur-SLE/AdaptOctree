@@ -5,8 +5,8 @@ import time
 
 import numpy as np
 
-from adaptoctree.morton import find_level
 from adaptoctree.tree import Octree
+import adaptoctree.morton as morton
 
 
 def balance(octree):
@@ -37,35 +37,17 @@ def balance(octree):
     while not balanced:
         # Examine nodes beginning with smallest by Morton Key
         current = octree[idx]
-        print(current)
+
+        # Generate neighbours of this octant
+        neighbours = morton.find_neighbours(current)
+
         idx = max(0, idx-1)
         if current.key == 0:
             balanced = True
 
-    level = find_level(octree[-1].key)
+    level = morton.find_level(octree[-1].key)
     # print(f"depth {level}")
 
     return refined
 
 
-if __name__ == "__main__":
-    np.random.seed(0)
-
-    N = int(50)
-    # sources = targets = make_moon(N)
-    sources = targets = np.random.rand(N, 3)
-
-    tree_conf = {
-        "sources": sources,
-        "targets": targets,
-        "maximum_level": 1,
-        "maximum_particles": 5
-    }
-
-    # Sort sources and targets by octant at level 1 of octree
-    start = time.time()
-    tree = Octree(**tree_conf)
-
-    print(tree)
-
-    # balance(tree)

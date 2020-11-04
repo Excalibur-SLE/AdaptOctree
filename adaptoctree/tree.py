@@ -27,7 +27,7 @@ class Octree:
 
     def __init__(self, sources, targets, maximum_level, maximum_particles):
 
-        self.tree, self.depth, self.size = build_tree(
+        self.tree, self.depth, self.size, self.working_set = build_tree(
             sources=sources,
             targets=targets,
             maximum_level=maximum_level,
@@ -78,10 +78,10 @@ def build_tree(
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     tree = [Node(0, sources, targets)]
+    working_set = set([0])
+
     built = False
     level = -1
-
-    min_key = max_key = tree[0].key
 
     size = 1
 
@@ -90,7 +90,6 @@ def build_tree(
 
         if (level == maximum_level):
             built = True
-
 
         # Heavy lifting
         source_keys = morton.encode_points(sources, level, octree_center, octree_radius)
@@ -115,17 +114,16 @@ def build_tree(
                 source_idxs = np.where(source_keys == leaf)
                 target_idxs = np.where(target_keys == leaf)
 
-                if unique_keys[i] >= max_key:
-
-                    tree.append(
-                        Node(
-                            key=unique_keys[i],
-                            sources=sources[source_idxs],
-                            targets=targets[target_idxs]
-                            )
+                tree.append(
+                    Node(
+                        key=leaf,
+                        sources=sources[source_idxs],
+                        targets=targets[target_idxs]
                         )
+                    )
 
-                    size += 1
+                working_set.add(leaf)
+                size += 1
 
         if (not refined_sources) or (not refined_targets):
             built = True
@@ -134,4 +132,4 @@ def build_tree(
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
 
-    return tree, level, size
+    return tree, level, size, working_set

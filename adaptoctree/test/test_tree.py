@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-from adaptoctree.tree import build_tree
+from adaptoctree.tree import Octree
 import adaptoctree.morton as morton
 
 
@@ -28,7 +28,6 @@ def plot_tree(tree, octree_center, octree_radius):
     unique = []
 
     for node in tree:
-        print('here', tree)
         level = morton.find_level(node.key)
         radius = octree_radius / (1 << level)
 
@@ -59,28 +58,30 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(100)
+    N = int(1e4)
     # sources = targets = make_moon(N)
     sources = targets = np.random.rand(N, 3)
 
     tree_conf = {
         "sources": sources,
         "targets": targets,
-        "maximum_level": 1,
-        "maximum_particles": 50
+        "maximum_level": 15,
+        "maximum_particles": 5
     }
 
     # Sort sources and targets by octant at level 1 of octree
     start = time.time()
-    tree, depth, size = build_tree(**tree_conf)
+    octree = Octree(**tree_conf)
     print(f"initial run: {time.time() - start}")
 
     max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
-    plot_tree(tree, octree_center, octree_radius)
 
-    print(f"tree {tree}")
+    # plot_tree(octree.tree, octree_center, octree_radius)
+
+    print(f"number of octants in tree {octree.size}")
+
 
 if __name__ == "__main__":
     main()
