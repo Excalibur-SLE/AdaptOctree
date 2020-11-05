@@ -200,45 +200,57 @@ def decode_key(key):
     return anchor
 
 
-# Neighbours for key 000 (binary)
-
-NEIGHBOURS = [
-    4, 2, 1, # Face neighbours
-    6, 5, 3, # Edge neighbours
-    7        # corner neighbours
-]
-
-
-def find_coarsest_neighbours(key):
+def find_deepest_first_descendent(a, maximum_level):
     """
-    Compute coarses possible neighbors of a given key done with bitwise
-        operations.
+    Find Morton key of deepest first descendent of octant A
 
     Parameters:
     -----------
-    key : int
+    a : int
         Morton key
+
+    Returns:
+    --------
+    int
+        Deepest first descendent of a given octant
+    """
+    # Get level
+    level = find_level(a)
+
+    # Remove level bits
+    dfd = a >> 16
+
+    # Find dfd
+    while level < maximum_level:
+
+        dfd =  dfd << 3
+        level += 1
+
+    # Append level information
+    dfd = dfd << 16
+    dfd |= maximum_level
+
+    return dfd
+
+
+def is_ancestor(a, b, maximum_level):
+    """
+    Check if octant a is an ancestor of octant b.
+
+    Parameters:
+    -----------
+    a : int
+        Morton key
+    b : int
+        Morton key
+
+    Returns:
+    --------
+    bool
     """
 
-    print('before', bin(key))
+    dfd = find_deepest_first_descendent(a, maximum_level)
 
-    level = find_level(key)
-
-    # Maximum box index at a given level [0, 2^level)
-    max_index = 2**level - 1
-
-    # Remove level bits
-    key = key >> 16
-
-    # Get to coarsest level bits that preserve 2:1 property, i.e. one level up
-    key = key >> 3
-
-    neighbors = []
-
-    shifts = []
-
-    # Coarsest possible neighbours identifiable through allowed bit-flips of
-    # coarsest possible bits in Morton encoding.
-    print('after', bin(key))
-
-    pass
+    if a < b <= dfd:
+        return True
+    return False

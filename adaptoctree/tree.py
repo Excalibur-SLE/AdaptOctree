@@ -7,6 +7,29 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
+
+
+def linearise(octree):
+    """
+    Remove overlaps in a sorted tree. Algorithm 7 in Sundar (2012).
+
+    Parameters:
+    -----------
+    octree : Octree
+
+    Returns:
+    --------
+    None
+    """
+    linearised = []
+
+    for i in range(len(octree)-1):
+        if not morton.is_ancestor(octree[i].key, octree[i+1].key):
+            linearised.append(tree[i])
+
+    octree.tree = linearised
+
+
 class Node:
     """
     Minimal octree node.
