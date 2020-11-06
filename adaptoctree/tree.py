@@ -42,19 +42,23 @@ def balance(octree, maximum_depth):
     # Working list
     W = octree.tree
 
+    # Need to pick up indices corresponding to level data in the working list
+
     # Temporary Buffer
     P = []
 
     # Final balanced tree
     R = []
 
-
     for level in range(maximum_depth, 1, -1):
         # Get subset of working list at this level
         Q = []
+
+        # Iterates over whole linear octree ....
         for w in W:
             if morton.find_level(w) == level:
                 Q.append(w)
+
         # Sort(Q), but should be sorted
         # Exclude siblings to reduce extra work
         T = []
@@ -200,6 +204,9 @@ def build_tree(
     level = 1
     size = 1
 
+    leaf_index = 0
+    level_index_ptr = []
+
     while not built:
 
         if (level == (maximum_level + 1)):
@@ -227,6 +234,9 @@ def build_tree(
                 refined_targets.append(targets[target_idxs])
 
             else:
+                # Need to keep a track of for the level index pointer
+                leaf_index += 1
+
                 tree.append(
                     Node(
                         key=leaf,
@@ -245,13 +255,9 @@ def build_tree(
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
 
+        level_index_ptr.append(leaf_index)
+        print(level_index_ptr, level, "LEVEL INDEX POINTER")
         level += 1
 
+    print('final', level_index_ptr)
     return tree, level, size, working_set
-
-
-if __name__ == "__main__":
-
-    a = [1,1,1,1,2,3,4,5]
-
-    print(remove_duplicates(a))

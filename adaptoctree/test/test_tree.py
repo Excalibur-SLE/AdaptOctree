@@ -58,7 +58,7 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(10)
+    N = int(100)
     # sources = targets = make_moon(N)
     sources = targets = np.random.rand(N, 3)
 
@@ -66,7 +66,7 @@ def main():
         "sources": sources,
         "targets": targets,
         "maximum_level": 15,
-        "maximum_particles": 25
+        "maximum_particles": 5
     }
 
     # Sort sources and targets by octant at level 1 of octree
