@@ -233,10 +233,10 @@ def find_deepest_first_descendent(a, maximum_level):
     return dfd
 
 
-# @numba.njit
+@numba.njit
 def not_ancestor(a, b):
     """
-    Check if octant a is an ancestor of octant b.
+    Check if octant a is not an ancestor of octant b.
 
     Parameters:
     -----------
@@ -268,3 +268,37 @@ def not_ancestor(a, b):
     b = b >> (3*(level_b - level_a))
 
     return bool(a^b)
+
+
+def find_siblings(a):
+    """
+    Find the siblings of a
+    """
+    pass
+
+def not_sibling(a, b):
+    """
+    Check if octant a is not a sibling of octant b.
+
+    Parameters:
+    -----------
+    a : int
+        Morton key
+    b : int
+        Morotn key
+
+    Returns:
+    --------
+    bool
+    """
+
+    # Check if a and b share a parent
+    a = a >> 3
+    b = b >> 3
+
+    # Get parent bits
+    mask = 7
+    a_parent = a & mask
+    b_parent = b & mask
+
+    return bool(a_parent^b_parent)

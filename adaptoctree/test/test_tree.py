@@ -58,7 +58,7 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(100)
+    N = int(10)
     # sources = targets = make_moon(N)
     sources = targets = np.random.rand(N, 3)
 
@@ -80,7 +80,7 @@ def main():
 
     linearise(octree)
 
-    # plot_tree(octree, octree_center, octree_radius)
+    plot_tree(octree, octree_center, octree_radius)
 
     # Furthest corner
     # anchor = [0, 0, 0, 1]

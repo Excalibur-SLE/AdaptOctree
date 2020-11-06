@@ -7,6 +7,54 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
+def balance(octree, maximum_depth):
+    """
+    Balance a sorted linear octree sequentially. Algorithm 8 in Sundar (2012).
+
+    Parameters:
+    -----------
+    octree : Octree
+
+    Returns:
+    --------
+    None
+    """
+
+    # Start algorithm at root
+
+    # Working list
+    W = octree.tree
+
+    # Temporary Buffer
+    P = []
+
+    # Final balanced tree
+    R = []
+
+
+    for level in range(maximum_depth, 1, -1):
+        # Get subset of working list at this level
+        Q = []
+        for w in W:
+            if morton.find_level(w) == level:
+                Q.append(w)
+        # Sort(Q), but should be sorted
+        # Exclude siblings to reduce extra work
+        T = []
+        for q in Q:
+            if not T:
+                T.append(q)
+            else:
+                for t in T:
+                    if not morton.not_sibling(a, t):
+                        T.append(q)
+
+
+
+
+
+
+
 def linearise(octree):
     """
     Remove overlaps in a sorted tree. Algorithm 7 in Sundar (2012).
