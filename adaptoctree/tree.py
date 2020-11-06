@@ -7,6 +7,23 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
+def remove_duplicates(a):
+    """
+    Dynamically de-dupe sorted list
+    """
+
+    res = []
+
+    tmp = None
+
+    for i, v in enumerate(a):
+        if v != tmp:
+            res.append(v)
+        tmp = a[i]
+
+    return res
+
+
 def balance(octree, maximum_depth):
     """
     Balance a sorted linear octree sequentially. Algorithm 8 in Sundar (2012).
@@ -47,15 +64,33 @@ def balance(octree, maximum_depth):
             else:
                 for t in T:
                     if not morton.not_sibling(a, t):
-                        siblings = morton.find_siblings(q)
-                        R = R + q
-                        P = P +
-
+                        T.append(q)
 
         for t in T:
-            R.append(t)
-            R.append(morton.find_neighbours(a))
+            R = R + morton.find_siblings(t)
+            P = P + morton.find_neighbours(morton.find_parent(t))
 
+        # Update Buffer and working list
+        W_new = []
+        for w in W:
+            if morton.find_level(w) == (level - 1):
+                P.append(w)
+            else:
+                W_new.append(w)
+
+        # Update working list
+        W = W_new
+        W = W + remove_duplicates(P)
+
+        # Reset buffer
+        P = []
+
+    # Sort R
+
+    # Linearise
+    linearise(R)
+
+    return R
 
 def linearise(octree):
     """
@@ -213,3 +248,10 @@ def build_tree(
         level += 1
 
     return tree, level, size, working_set
+
+
+if __name__ == "__main__":
+
+    a = [1,1,1,1,2,3,4,5]
+
+    print(remove_duplicates(a))
