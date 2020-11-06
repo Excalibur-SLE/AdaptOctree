@@ -270,12 +270,26 @@ def not_ancestor(a, b):
     return bool(a^b)
 
 
+@numba.njit
 def find_siblings(a):
     """
     Find the siblings of a
     """
-    pass
 
+    suffixes = [
+        0, 1, 2, 3, 4, 5, 6, 7
+    ]
+
+    a_parent = (a >> 3) << 3
+    siblings = []
+
+    for suffix in suffixes:
+        siblings.append(a_parent | suffix)
+
+    return siblings
+
+
+@numba.njit
 def not_sibling(a, b):
     """
     Check if octant a is not a sibling of octant b.
@@ -285,7 +299,7 @@ def not_sibling(a, b):
     a : int
         Morton key
     b : int
-        Morotn key
+        Morton key
 
     Returns:
     --------
