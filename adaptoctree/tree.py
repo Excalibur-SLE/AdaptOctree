@@ -47,12 +47,14 @@ def balance(octree, maximum_depth):
             else:
                 for t in T:
                     if not morton.not_sibling(a, t):
-                        T.append(q)
+                        siblings = morton.find_siblings(q)
+                        R = R + q
+                        P = P +
 
 
-
-
-
+        for t in T:
+            R.append(t)
+            R.append(morton.find_neighbours(a))
 
 
 def linearise(octree):

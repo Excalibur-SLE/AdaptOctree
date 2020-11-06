@@ -155,6 +155,17 @@ def encode_anchor(anchor):
 
     return key
 
+
+def encode_anchors(anchors):
+
+    keys = []
+
+    for anchor in anchors:
+        keys.append(encode_anchor(anchor))
+
+    return np.array(keys, dtype=np.int64)
+
+
 @numba.njit
 def decode_key(key):
     """
@@ -274,6 +285,15 @@ def not_ancestor(a, b):
 def find_siblings(a):
     """
     Find the siblings of a
+
+    Parameters:
+    -----------
+    a : int
+        Morton key
+
+    Returns:
+    --------
+    [int]
     """
 
     suffixes = [
@@ -316,3 +336,57 @@ def not_sibling(a, b):
     b_parent = b & mask
 
     return bool(a_parent^b_parent)
+
+
+@numba.njit
+def find_neighbours(a):
+    """
+    Find all potential neighbours of octant a at a given level
+
+    Parameters:
+    -----------
+    a : int
+        Morton key
+
+    Returns:
+    --------
+    [int]
+    """
+    anchor = decode_key(a)
+    x = anchor[0]
+    y = anchor[1]
+    z = anchor[2]
+    level = anchor[-1]
+    max_index = 1 << level
+
+    neighbours = []
+    for i in range(-1, 2):
+        for j in range(-1, 2):
+            for k in range(-1, 2):
+
+                neighbour_anchor = np.array([x+i, y+j, z+k, level])
+
+                if ((not np.any(neighbour_anchor < 0))
+                        or (not np.any(neighbour_anchor >= max_index))):
+                    neighbours.append(neighbour_anchor)
+
+    neighbours = encode_anchors(neighbours)
+    neighbours = neighbours[neighbours != a]
+    return neighbours
+
+
+@numba.njit
+def find_parent(a):
+    """
+    Find parent octant of a
+
+    Parameters:
+    -----------
+    a : int
+        Morton key
+
+    Returns:
+    --------
+    int
+    """
+    return a >> 3
