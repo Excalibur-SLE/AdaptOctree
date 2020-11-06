@@ -233,7 +233,8 @@ def find_deepest_first_descendent(a, maximum_level):
     return dfd
 
 
-def is_ancestor(a, b, maximum_level):
+# @numba.njit
+def not_ancestor(a, b):
     """
     Check if octant a is an ancestor of octant b.
 
@@ -249,8 +250,21 @@ def is_ancestor(a, b, maximum_level):
     bool
     """
 
-    dfd = find_deepest_first_descendent(a, maximum_level)
+    # Extract level
+    level_a = find_level(a)
+    level_b = find_level(b)
 
-    if a < b <= dfd:
+    if (level_a == level_b) and (a != b):
         return True
-    return False
+
+    if (level_a > level_b):
+        return True
+
+    # Remove level offset
+    a = a >> 16
+    b = b >> 16
+
+    # Check remaining bits of a against b
+    b = b >> (3*(level_b - level_a))
+
+    return bool(a^b)

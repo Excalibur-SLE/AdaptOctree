@@ -7,8 +7,6 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
-
-
 def linearise(octree):
     """
     Remove overlaps in a sorted tree. Algorithm 7 in Sundar (2012).
@@ -22,12 +20,17 @@ def linearise(octree):
     None
     """
     linearised = []
+    size = 1
 
     for i in range(len(octree)-1):
-        if not morton.is_ancestor(octree[i].key, octree[i+1].key):
-            linearised.append(tree[i])
+        if morton.not_ancestor(octree[i].key, octree[i+1].key):
+            linearised.append(octree[i])
+            size += 1
+
+    linearised.append(octree[-1])
 
     octree.tree = linearised
+    octree.size = size
 
 
 class Node:
@@ -58,6 +61,8 @@ class Octree:
             )
 
         self.maximum_level = maximum_level
+        self.sources = sources
+        self.targets = targets
 
     def __repr__(self):
         return f"<tree>" \
@@ -70,6 +75,9 @@ class Octree:
 
     def __setitem__(self, key, value):
         self.tree[key] = value
+
+    def __len__(self):
+        return len(self.tree)
 
 
 def build_tree(
@@ -100,18 +108,16 @@ def build_tree(
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
-    tree = [Node(0, sources, targets)]
+    tree = []
     working_set = set([0])
 
     built = False
-    level = -1
-
+    level = 1
     size = 1
 
     while not built:
-        level += 1
 
-        if (level == maximum_level):
+        if (level == (maximum_level + 1)):
             built = True
 
         # Heavy lifting
@@ -127,16 +133,15 @@ def build_tree(
 
         for i, count in enumerate(counts):
             leaf = unique_keys[i]
+
+            source_idxs = np.where(source_keys == leaf)
+            target_idxs = np.where(target_keys == leaf)
+
             if count > maximum_particles:
-                source_idxs = np.where(source_keys == leaf)
-                target_idxs = np.where(target_keys == leaf)
                 refined_sources.append(sources[source_idxs])
                 refined_targets.append(targets[target_idxs])
 
             else:
-                source_idxs = np.where(source_keys == leaf)
-                target_idxs = np.where(target_keys == leaf)
-
                 tree.append(
                     Node(
                         key=leaf,
@@ -154,5 +159,7 @@ def build_tree(
         else:
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
+
+        level += 1
 
     return tree, level, size, working_set
