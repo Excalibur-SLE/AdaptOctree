@@ -40,9 +40,9 @@ def find_center_from_key(key, x0, r0):
 @numba.njit(cache=True)
 def find_level(key):
     """
-    Find the last 16 bits of a key, corresponding to a level.
+    Find the last 15 bits of a key, corresponding to a level.
     """
-    return key & 0xffff
+    return key & 0x7fff
 
 
 def find_bounds(sources, targets):
@@ -125,7 +125,7 @@ def encode_points(points, level, x0, r0):
 def encode_anchor(anchor):
     """
     Morton encode a set of anchor coordinates and their octree level. Assume a
-        maximum of 16 bits for each anchor coordinate, and 16 bits for level.
+        maximum of 15 bits for each anchor coordinate, and 16 bits for level.
         Strategy is to examine byte by byte, from most to least significant
         bytes, and find interleaving using the lookup table. Finally, level
         information is appended to the tail.
@@ -150,7 +150,7 @@ def encode_anchor(anchor):
     key = (key << 24) | Z_LOOKUP[z & 0xff] | Y_LOOKUP[y & 0xff] | X_LOOKUP[x & 0xff]
 
     # Append level
-    key = key << 16
+    key = key << 15
     key = key | level
 
     return key
@@ -185,8 +185,8 @@ def decode_key(key):
     x = 0
     y = 0
     z = 0
-    level = key & 0xffff
-    key = key >> 16
+    level = key & 0x7fff
+    key = key >> 15
 
     def extract(x):
         """extract every third bit from 24 bit integer"""
@@ -300,11 +300,19 @@ def find_siblings(a):
         0, 1, 2, 3, 4, 5, 6, 7
     ]
 
-    a_parent = (a >> 3) << 3
+    # Extract and remove level bits
+    level = find_level(a)
+    a = a >> 15
+
+    # Clear suffix of a
+    a_root = (a >> 3) << 3
+
     siblings = []
 
     for suffix in suffixes:
-        siblings.append(a_parent | suffix)
+        sibling = a_root | suffix
+        sibling = ((sibling << 15) | level)
+        siblings.append(sibling)
 
     return siblings
 
@@ -375,7 +383,7 @@ def find_neighbours(a):
     return neighbours
 
 
-@numba.njit
+# @numba.njit
 def find_parent(a):
     """
     Find parent octant of a
@@ -389,4 +397,26 @@ def find_parent(a):
     --------
     int
     """
-    return a >> 3
+    # Extract and remove level bits
+    level = find_level(a)
+    a = a >> 15
+
+    parent_level = level - 1
+
+    parent = a >> 3
+    parent = parent << 15
+    parent = parent | parent_level
+    return parent
+
+
+if __name__ == "__main__":
+
+    anchor = np.array([1,0,1,1], dtype=np.int16)
+
+    key = encode_anchor(anchor)
+
+    siblings = find_siblings(key)
+
+    print(f'key {key}, bin(key) {bin(key)}')
+    print('siblings', siblings)
+    print('bin siblings', [bin(s) for s in siblings])

@@ -8,7 +8,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-from adaptoctree.tree import Octree, linearise
+from adaptoctree.tree import Octree, linearise, balance
 import adaptoctree.morton as morton
 
 
@@ -66,7 +66,7 @@ def main():
         "sources": sources,
         "targets": targets,
         "maximum_level": 15,
-        "maximum_particles": 5
+        "maximum_particles": 20
     }
 
     # Sort sources and targets by octant at level 1 of octree
@@ -78,7 +78,9 @@ def main():
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
-    linearise(octree)
+    balance(octree)
+
+    # linearise(octree)
 
     plot_tree(octree, octree_center, octree_radius)
 
