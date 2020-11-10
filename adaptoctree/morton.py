@@ -346,7 +346,7 @@ def not_sibling(a, b):
     return bool(a_parent^b_parent)
 
 
-@numba.njit
+# @numba.njit
 def find_neighbours(a):
     """
     Find all potential neighbours of octant a at a given level
@@ -374,8 +374,9 @@ def find_neighbours(a):
 
                 neighbour_anchor = np.array([x+i, y+j, z+k, level])
 
-                if ((not np.any(neighbour_anchor < 0))
-                        or (not np.any(neighbour_anchor >= max_index))):
+                if ((np.any(neighbour_anchor < 0)) or (np.any(neighbour_anchor >= max_index))):
+                    pass
+                else:
                     neighbours.append(neighbour_anchor)
 
     neighbours = encode_anchors(neighbours)
@@ -411,12 +412,13 @@ def find_parent(a):
 
 if __name__ == "__main__":
 
-    anchor = np.array([1,0,1,1], dtype=np.int16)
+    anchor = np.array([0, 0, 0, 1], dtype=np.int16)
 
     key = encode_anchor(anchor)
 
     siblings = find_siblings(key)
+    neighbours = find_neighbours(key)
 
     print(f'key {key}, bin(key) {bin(key)}')
-    print('siblings', siblings)
-    print('bin siblings', [bin(s) for s in siblings])
+
+    print('neighbours ', neighbours)

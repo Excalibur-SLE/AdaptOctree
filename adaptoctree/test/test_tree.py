@@ -12,7 +12,7 @@ from adaptoctree.tree import Octree, linearise, balance
 import adaptoctree.morton as morton
 
 
-def plot_tree(octree, octree_center, octree_radius):
+def plot_tree(octree, sources, octree_center, octree_radius):
     """
 
     Parameters:
@@ -27,11 +27,11 @@ def plot_tree(octree, octree_center, octree_radius):
 
     unique = []
 
-    for node in octree.tree:
-        level = morton.find_level(node.key)
+    for node in octree:
+        level = morton.find_level(node)
         radius = octree_radius / (1 << level)
 
-        center = morton.find_center_from_key(node.key, octree_center, octree_radius)
+        center = morton.find_center_from_key(node, octree_center, octree_radius)
 
         r = [-radius, radius]
 
@@ -40,7 +40,6 @@ def plot_tree(octree, octree_center, octree_radius):
                 ax.plot3D(*zip(s+center, e+center), color="b")
 
     # Plot particle data
-    sources = octree.sources
     ax.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
     plt.show()
 
@@ -59,14 +58,14 @@ def main():
     np.random.seed(0)
 
     N = int(100)
-    # sources = targets = make_moon(N)
-    sources = targets = np.random.rand(N, 3)
+    sources = targets = make_moon(N)
+    # sources = targets = np.random.rand(N, 3)
 
     tree_conf = {
         "sources": sources,
         "targets": targets,
         "maximum_level": 15,
-        "maximum_particles": 20
+        "maximum_particles": 25
     }
 
     # Sort sources and targets by octant at level 1 of octree
@@ -78,11 +77,15 @@ def main():
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
-    balance(octree)
+    balanced = balance(octree)
 
     # linearise(octree)
+    original = [n.key for n in octree.tree]
 
-    plot_tree(octree, octree_center, octree_radius)
+    plot_tree(balanced, octree.sources, octree_center, octree_radius)
+
+    # print(balanced, len(balanced))
+    # print(original, len(original))
 
     # Furthest corner
     # anchor = [0, 0, 0, 1]

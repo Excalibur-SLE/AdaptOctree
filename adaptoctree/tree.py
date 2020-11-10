@@ -28,25 +28,55 @@ def balance(octree):
 
     depth = octree.depth
 
-    tree = [n.key for n in octree.tree]
+    W = [n.key for n in octree.tree]
+    print("initial len tree", len(W))
+
+    P = []
 
     balanced = []
 
     for level in range(depth, 0, -1):
 
         # Working list
-        W = []
+        Q = []
 
         # Create working list of leaves at current level
-        for key in tree:
+        for w in W:
 
-            if morton.find_level(key) == level:
-                W.append(key)
+            if morton.find_level(w) == level:
+                Q.append(w)
 
-        # For each node in working list
+        Q.sort()
 
+        T = []
+        for q in Q:
+            siblings = morton.find_siblings(q)
+            siblings_in_T = False
+            for sibling in siblings:
+                if sibling in T:
+                    siblings_in_T = True
+            if not siblings_in_T:
+                T.append(q)
 
+        for t in T:
+            balanced = balanced + list(morton.find_siblings(t))
+            P = P + list(morton.find_neighbours(morton.find_parent(t)))
 
+        for w in W:
+            if morton.find_level(w) == (level-1):
+                P.append(w)
+
+        # Remove duplicates in P
+        P.sort()
+        P = remove_duplicates(P)
+
+        W = W + P
+        P = []
+
+    balanced.sort()
+    balanced = linearise(balanced)
+
+    return balanced
 
 # def balance(octree, maximum_depth):
 #     """
@@ -136,14 +166,13 @@ def linearise(octree):
     size = 1
 
     for i in range(len(octree)-1):
-        if morton.not_ancestor(octree[i].key, octree[i+1].key):
+        if morton.not_ancestor(octree[i], octree[i+1]):
             linearised.append(octree[i])
             size += 1
 
     linearised.append(octree[-1])
 
-    octree.tree = linearised
-    octree.size = size
+    return linearised
 
 
 class Node:
