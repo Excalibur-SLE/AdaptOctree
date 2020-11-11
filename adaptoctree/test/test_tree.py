@@ -12,7 +12,7 @@ from adaptoctree.tree import Octree, linearise, balance
 import adaptoctree.morton as morton
 
 
-def plot_tree(octree, sources, octree_center, octree_radius):
+def plot_tree(octree, balanced, sources, octree_center, octree_radius):
     """
 
     Parameters:
@@ -22,8 +22,10 @@ def plot_tree(octree, sources, octree_center, octree_radius):
 
     points = []
 
-    fig = plt.figure()
-    ax = fig.add_subplot(111, projection='3d')
+    fig1 = plt.figure()
+    fig2 = plt.figure()
+    ax1 = fig1.add_subplot(111, projection='3d')
+    ax2 = fig2.add_subplot(111, projection='3d')
 
     unique = []
 
@@ -37,10 +39,23 @@ def plot_tree(octree, sources, octree_center, octree_radius):
 
         for s, e in itertools.combinations(np.array(list(itertools.product(r, r, r))), 2):
             if np.sum(np.abs(s-e)) == r[1]-r[0]:
-                ax.plot3D(*zip(s+center, e+center), color="b")
+                ax1.plot3D(*zip(s+center, e+center), color="b")
+
+    for node in balanced:
+        level = morton.find_level(node)
+        radius = octree_radius / (1 << level)
+
+        center = morton.find_center_from_key(node, octree_center, octree_radius)
+
+        r = [-radius, radius]
+
+        for s, e in itertools.combinations(np.array(list(itertools.product(r, r, r))), 2):
+            if np.sum(np.abs(s-e)) == r[1]-r[0]:
+                ax2.plot3D(*zip(s+center, e+center), color="b")
 
     # Plot particle data
-    ax.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
+    ax1.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
+    ax2.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
     plt.show()
 
 
@@ -57,7 +72,7 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(100)
+    N = int(500)
     sources = targets = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
 
@@ -81,8 +96,7 @@ def main():
 
     # linearise(octree)
     original = [n.key for n in octree.tree]
-
-    plot_tree(balanced, octree.sources, octree_center, octree_radius)
+    plot_tree(original, balanced, octree.sources, octree_center, octree_radius)
 
     # print(balanced, len(balanced))
     # print(original, len(original))

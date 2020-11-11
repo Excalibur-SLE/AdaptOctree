@@ -29,7 +29,6 @@ def balance(octree):
     depth = octree.depth
 
     W = [n.key for n in octree.tree]
-    print("initial len tree", len(W))
 
     P = []
 
@@ -78,77 +77,6 @@ def balance(octree):
 
     return balanced
 
-# def balance(octree, maximum_depth):
-#     """
-#     Balance a sorted linear octree sequentially. Algorithm 8 in Sundar (2012).
-
-#     Parameters:
-#     -----------
-#     octree : Octree
-
-#     Returns:
-#     --------
-#     None
-#     """
-
-#     # Start algorithm at root
-
-#     # Working list
-#     W = octree.tree
-
-#     # Need to pick up indices corresponding to level data in the working list
-
-#     # Temporary Buffer
-#     P = []
-
-#     # Final balanced tree
-#     R = []
-
-#     for level in range(maximum_depth, 1, -1):
-#         # Get subset of working list at this level
-#         Q = []
-
-#         # Iterates over whole linear octree ....
-#         for w in W:
-#             if morton.find_level(w) == level:
-#                 Q.append(w)
-
-#         # Sort(Q), but should be sorted
-#         # Exclude siblings to reduce extra work
-#         T = []
-#         for q in Q:
-#             if not T:
-#                 T.append(q)
-#             else:
-#                 for t in T:
-#                     if not morton.not_sibling(a, t):
-#                         T.append(q)
-
-#         for t in T:
-#             R = R + morton.find_siblings(t)
-#             P = P + morton.find_neighbours(morton.find_parent(t))
-
-#         # Update Buffer and working list
-#         W_new = []
-#         for w in W:
-#             if morton.find_level(w) == (level - 1):
-#                 P.append(w)
-#             else:
-#                 W_new.append(w)
-
-#         # Update working list
-#         W = W_new
-#         W = W + remove_duplicates(P)
-
-#         # Reset buffer
-#         P = []
-
-#     # Sort R
-
-#     # Linearise
-#     linearise(R)
-
-#     return R
 
 def linearise(octree):
     """
