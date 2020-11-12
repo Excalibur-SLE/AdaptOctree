@@ -1,5 +1,8 @@
 """
-Lookup tables for Morton encoding
+Lookup tables for Morton encoding of x, y and z indices in the range [0, 255].
+
+To Morton encodings for larger indices can be built by looping through them byte
+by byte.
 """
 import numpy as np
 
