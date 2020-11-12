@@ -1,5 +1,17 @@
 """
 Construct an adaptive linear octree form a set of points.
+
+Problems in implementation:
+---------------------------
+
+1) Lists used in filtering for balancing algortihm for nodes at a give level.
+Can be fixed using another data structure holding an index pointer for a given
+level.
+2) Sibling checker involves a specific loop.
+3) Don't associate points with new nodes, this means that we can't construct
+another Octree class for the balanced tree. This can be done at the end, after
+the balanced nodes have been found - they can be 'filled'.
+
 """
 import numba
 import numpy as np
@@ -25,13 +37,25 @@ def remove_duplicates(a):
 
 
 def balance(octree):
+    """
+    Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
+        (2012).
+
+    Parameters:
+    -----------
+    octree : Octree
+
+    Returns:
+    --------
+    Octree
+    """
 
     depth = octree.depth
 
-    W = [n.key for n in octree.tree]
+    W = octree.tree
+    level_index_pointer = octree.level_index_pointer
 
     P = []
-
     balanced = []
 
     for level in range(depth, 0, -1):
@@ -40,8 +64,8 @@ def balance(octree):
         Q = []
 
         # Create working list of leaves at current level
+        # Need efficient level filter
         for w in W:
-
             if morton.find_level(w) == level:
                 Q.append(w)
 
@@ -51,9 +75,11 @@ def balance(octree):
         for q in Q:
             siblings = morton.find_siblings(q)
             siblings_in_T = False
+
             for sibling in siblings:
                 if sibling in T:
                     siblings_in_T = True
+
             if not siblings_in_T:
                 T.append(q)
 
@@ -61,6 +87,7 @@ def balance(octree):
             balanced = balanced + list(morton.find_siblings(t))
             P = P + list(morton.find_neighbours(morton.find_parent(t)))
 
+        # Need efficient level filter
         for w in W:
             if morton.find_level(w) == (level-1):
                 P.append(w)
@@ -91,31 +118,14 @@ def linearise(octree):
     None
     """
     linearised = []
-    size = 1
 
     for i in range(len(octree)-1):
         if morton.not_ancestor(octree[i], octree[i+1]):
             linearised.append(octree[i])
-            size += 1
 
     linearised.append(octree[-1])
 
     return linearised
-
-
-class Node:
-    """
-    Minimal octree node.
-    """
-    def __init__(self, key, sources, targets, children=None):
-        self.key = key
-        self.sources = sources
-        self.targets = targets
-        if children is not None:
-            self.children = children
-
-    def __repr__(self):
-        return f"<morton_id>{self.key}</morton_id>"
 
 
 class Octree:
@@ -123,7 +133,7 @@ class Octree:
 
     def __init__(self, sources, targets, maximum_level, maximum_particles):
 
-        self.tree, self.depth, self.size = build_tree(
+        self.tree, self.depth, self.size, self.level_index_pointer = build_tree(
             sources=sources,
             targets=targets,
             maximum_level=maximum_level,
@@ -159,10 +169,13 @@ def build_tree(
     """
     Top-down construction of an adaptive octree mesh.
 
+    NOTE: level_index_pointer starts from level 1 NOT level 0, as this is where
+        Octree construction starts.
+
     Parameters:
     -----------
-    sources : np.array(shape=(nsources, 3))
-    targets : np.array(shape=(nsources, 3))
+    sources : np.array(shape=(nsources, 3), dtype=np.float32)
+    targets : np.array(shape=(nsources, 3), dtype=np.float32)
     maximum_level : np.int32
         Maximum level of the octree.
     maximum_particles : np.int32
@@ -170,8 +183,8 @@ def build_tree(
 
     Returns:
     --------
-    [Node]
-        Adaptive linear Octree.
+    Octree
+        Unbalanced adaptive linear Octree.
     """
 
     max_bound, min_bound = morton.find_bounds(sources, targets)
@@ -185,11 +198,11 @@ def build_tree(
     size = 1
 
     leaf_index = 0
-    level_index_ptr = []
+    level_index_pointer = [leaf_index]
 
     while not built:
 
-        if (level == (maximum_level + 1)):
+        if (level == (maximum_level)):
             depth = maximum_level
             built = True
 
@@ -198,6 +211,7 @@ def build_tree(
         target_keys = morton.encode_points(targets, level, octree_center, octree_radius)
 
         particle_keys = np.hstack((source_keys, target_keys))
+
         particle_index_array = np.argsort(particle_keys)
         unique_keys, counts = np.unique(particle_keys, return_counts=True) # O(N)
 
@@ -217,15 +231,7 @@ def build_tree(
             else:
                 # Need to keep a track of for the level index pointer
                 leaf_index += 1
-
-                tree.append(
-                    Node(
-                        key=leaf,
-                        sources=sources[source_idxs],
-                        targets=targets[target_idxs]
-                        )
-                    )
-
+                tree.append(leaf)
                 size += 1
 
         if (not refined_sources) or (not refined_targets):
@@ -236,7 +242,7 @@ def build_tree(
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
 
-        level_index_ptr.append(leaf_index)
+        level_index_pointer.append(leaf_index)
         level += 1
 
-    return tree, depth, size
+    return tree, depth, size, level_index_pointer

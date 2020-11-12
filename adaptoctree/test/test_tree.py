@@ -1,5 +1,10 @@
 """
-Test tree construction
+Test tree construction.
+
+
+Need some kind of test to ensure that all points are assigned. There's a
+relationship between maximum level and max number of particles per box that needs
+to observed.
 """
 import itertools
 import time
@@ -79,8 +84,8 @@ def main():
     tree_conf = {
         "sources": sources,
         "targets": targets,
-        "maximum_level": 15,
-        "maximum_particles": 25
+        "maximum_level": 10,
+        "maximum_particles": 10
     }
 
     # Sort sources and targets by octant at level 1 of octree
@@ -94,29 +99,12 @@ def main():
 
     balanced = balance(octree)
 
-    # linearise(octree)
-    original = [n.key for n in octree.tree]
+    original = octree.tree
     plot_tree(original, balanced, octree.sources, octree_center, octree_radius)
 
-    # print(balanced, len(balanced))
-    # print(original, len(original))
-
-    # Furthest corner
-    # anchor = [0, 0, 0, 1]
-    # desc = [1, 1, 1, 2]
-
-    # maximum_level = 10
-
-    # a = morton.encode_anchor(anchor)
-    # b = morton.encode_anchor(desc)
-
-    # print(f'a {bin(a)}')
-    # print(f'b {bin(b)}')
-
-    # print(f'not ancestor: {morton.not_ancestor(a, b)}')
-
-
-
+    # print(octree.level_index_pointer)
+    # print([morton.find_level(o) for o in octree.tree])
+    # print(octree.depth)
 
 if __name__ == "__main__":
     main()
