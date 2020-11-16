@@ -105,6 +105,29 @@ def balance(octree):
     return balanced
 
 
+def numpy_linearise(octree):
+    """
+    Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
+
+    Parameters:
+    -----------
+    octree : np.array(dtype=np.int64)
+
+    Returns:
+    --------
+    np.array(np.int64)
+    """
+    mask = np.zeros_like(octree, dtype=bool)
+
+    n_octants, _ = octree.shape
+
+    for i in range(n_octants-1):
+        if morton.not_ancestor(octree[i], octree[i-1]):
+            mask[i] = True
+
+    return octree[mask]
+
+
 def linearise(octree):
     """
     Remove overlaps in a sorted tree. Algorithm 7 in Sundar (2012).
