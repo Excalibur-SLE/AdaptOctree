@@ -53,79 +53,88 @@ def balance(octree):
     depth = octree.depth
 
     W = octree.tree
-    level_index_pointer = octree.level_index_pointer
 
-    P = []
-    balanced = []
+    P = None
+    balanced = None
 
     for level in range(depth, 0, -1):
 
-        # Working list
-        Q = []
+        # Working list, filtered to current level
+        Q = W[W[:,1] == level]
 
-        # Create working list of leaves at current level
-        # Need efficient level filter
-        for w in W:
-            if morton.find_level(w) == level:
-                Q.append(w)
-
-        Q.sort()
+        # Q.sort()
 
         T = []
-        for q in Q:
-            siblings = morton.find_siblings(q)
-            siblings_in_T = False
+        len_Q, _ = Q.shape
+        T_mask = np.zeros(len_Q, dtype=bool)
+        T_siblings = set()
 
-            for sibling in siblings:
-                if sibling in T:
-                    siblings_in_T = True
+        parents = set()
 
-            if not siblings_in_T:
-                T.append(q)
+        for i, q in enumerate(Q):
+            parent = morton.find_parent(q[0])
+            if parent not in parents:
+                T_mask[i] = True
+                parents.add(parent)
+
+        T = Q[T_mask]
 
         for t in T:
-            balanced = balanced + list(morton.find_siblings(t))
-            P = P + list(morton.find_neighbours(morton.find_parent(t)))
+            siblings = morton.find_siblings(t[0])
+            neighbours = morton.find_neighbours(morton.find_parent(t[0]))
 
-        # Need efficient level filter
-        for w in W:
-            if morton.find_level(w) == (level-1):
-                P.append(w)
+            sibling_levels = morton.find_level(siblings)
+            neighbour_levels = morton.find_level(neighbours)
 
-        # Remove duplicates in P
-        P.sort()
-        P = remove_duplicates(P)
+            tmp_siblings = np.c_[siblings, sibling_levels]
+            tmp_neigbours = np.c_[neighbours, neighbour_levels]
 
-        W = W + P
-        P = []
+            if balanced is None:
+                balanced = tmp_siblings
+            else:
+                balanced = np.r_[balanced, tmp_siblings]
 
-    balanced.sort()
-    balanced = linearise(balanced)
+            if P is None:
+                P = tmp_neigbours
+            else:
+                P = np.r_[P, tmp_neigbours]
+
+        # Remove duplicates in P, if they exist
+        P = np.r_[P, W[W[:,1]==(level-1)]]
+        if P.shape[0] > 0:
+            P = np.unique(P, axis=0)
+
+        W = np.r_[W, P]
+        P = None
+
+    tmp = np.sort(balanced[:,0])
+    balanced = numpy_linearise(tmp)
 
     return balanced
 
 
-def numpy_linearise(octree):
+def numpy_linearise(tree):
     """
     Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
 
     Parameters:
     -----------
-    octree : np.array(dtype=np.int64)
+    tree : np.array(dtype=np.int64)
 
     Returns:
     --------
     np.array(np.int64)
     """
-    mask = np.zeros_like(octree, dtype=bool)
 
-    n_octants, _ = octree.shape
+    mask = np.zeros_like(tree, dtype=bool)
+
+    n_octants = tree.shape[0]
 
     for i in range(n_octants-1):
-        if morton.not_ancestor(octree[i], octree[i-1]):
+        if morton.not_ancestor(tree[i], tree[i-1]):
             mask[i] = True
 
-    return octree[mask]
+    return tree[mask]
 
 
 def linearise(octree):
@@ -156,7 +165,7 @@ class Octree:
 
     def __init__(self, sources, targets, maximum_level, maximum_particles):
 
-        self.tree, self.depth, self.size, self.level_index_pointer = build_tree(
+        self.tree, self.depth, self.size = build_tree(
             sources=sources,
             targets=targets,
             maximum_level=maximum_level,
@@ -221,7 +230,6 @@ def build_tree(
     size = 1
 
     leaf_index = 0
-    level_index_pointer = [leaf_index]
 
     while not built:
 
@@ -254,7 +262,7 @@ def build_tree(
             else:
                 # Need to keep a track of for the level index pointer
                 leaf_index += 1
-                tree.append(leaf)
+                tree.append((leaf, level))
                 size += 1
 
         if (not refined_sources) or (not refined_targets):
@@ -265,7 +273,6 @@ def build_tree(
             sources = np.concatenate(refined_sources)
             targets = np.concatenate(refined_targets)
 
-        level_index_pointer.append(leaf_index)
         level += 1
 
-    return tree, depth, size, level_index_pointer
+    return np.array(tree), depth, size

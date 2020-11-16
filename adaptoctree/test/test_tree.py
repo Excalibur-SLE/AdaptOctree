@@ -85,7 +85,7 @@ def main():
         "sources": sources,
         "targets": targets,
         "maximum_level": 10,
-        "maximum_particles": 10
+        "maximum_particles": 150
     }
 
     # Sort sources and targets by octant at level 1 of octree
@@ -100,11 +100,8 @@ def main():
     balanced = balance(octree)
 
     original = octree.tree
-    plot_tree(original, balanced, octree.sources, octree_center, octree_radius)
 
-    # print(octree.level_index_pointer)
-    # print([morton.find_level(o) for o in octree.tree])
-    # print(octree.depth)
+    plot_tree(original[:,0], balanced, octree.sources, octree_center, octree_radius)
 
 if __name__ == "__main__":
     main()
