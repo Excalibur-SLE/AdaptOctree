@@ -77,7 +77,7 @@ def make_moon(npoints):
 def main():
     np.random.seed(0)
 
-    N = int(500)
+    N = int(100000)
     sources = targets = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
 
@@ -91,17 +91,20 @@ def main():
     # Sort sources and targets by octant at level 1 of octree
     start = time.time()
     octree = Octree(**tree_conf)
-    print(f"initial run: {time.time() - start}")
+    print(f"Adaptive tree construction runtime: {time.time() - start}")
 
     max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
+    start = time.time()
     balanced = balance(octree)
+    print(f"Balancing runtime: {time.time() - start}")
 
     original = octree.tree
 
-    plot_tree(original[:,0], balanced, octree.sources, octree_center, octree_radius)
+    # plot_tree(original[:,0], balanced, octree.sources, octree_center, octree_radius)
+
 
 if __name__ == "__main__":
     main()

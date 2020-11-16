@@ -19,23 +19,6 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
-def remove_duplicates(a):
-    """
-    Dynamically de-dupe sorted list
-    """
-
-    res = []
-
-    tmp = None
-
-    for i, v in enumerate(a):
-        if v != tmp:
-            res.append(v)
-        tmp = a[i]
-
-    return res
-
-
 def balance(octree):
     """
     Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
@@ -63,11 +46,9 @@ def balance(octree):
         Q = W[W[:,1] == level]
 
         # Q.sort()
-
         T = []
         len_Q, _ = Q.shape
         T_mask = np.zeros(len_Q, dtype=bool)
-        T_siblings = set()
 
         parents = set()
 
@@ -107,13 +88,12 @@ def balance(octree):
         W = np.r_[W, P]
         P = None
 
+    # Sort and linearise
     tmp = np.sort(balanced[:,0])
-    balanced = numpy_linearise(tmp)
-
-    return balanced
+    return linearise(tmp)
 
 
-def numpy_linearise(tree):
+def linearise(tree):
     """
     Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
 
@@ -135,29 +115,6 @@ def numpy_linearise(tree):
             mask[i] = True
 
     return tree[mask]
-
-
-def linearise(octree):
-    """
-    Remove overlaps in a sorted tree. Algorithm 7 in Sundar (2012).
-
-    Parameters:
-    -----------
-    octree : Octree
-
-    Returns:
-    --------
-    None
-    """
-    linearised = []
-
-    for i in range(len(octree)-1):
-        if morton.not_ancestor(octree[i], octree[i+1]):
-            linearised.append(octree[i])
-
-    linearised.append(octree[-1])
-
-    return linearised
 
 
 class Octree:
@@ -200,9 +157,6 @@ def build_tree(
     ):
     """
     Top-down construction of an adaptive octree mesh.
-
-    NOTE: level_index_pointer starts from level 1 NOT level 0, as this is where
-        Octree construction starts.
 
     Parameters:
     -----------
