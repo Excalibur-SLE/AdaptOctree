@@ -8,39 +8,6 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
-class Octree:
-    """Minimal, list-like, octree"""
-
-    def __init__(self, sources, targets, maximum_level, maximum_particles):
-
-
-        self.tree, self.depth, self.size = build(
-            sources=sources,
-            targets=targets,
-            maximum_level=maximum_level,
-            maximum_particles=maximum_particles
-            )
-
-        self.maximum_level = maximum_level
-        self.sources = sources
-        self.targets = targets
-
-    def __repr__(self):
-        return f"<tree>" \
-               f"<maximum_level>{self.maximum_level}</maximum_level>" \
-               f"<depth>{self.depth}</depth>"\
-               f"</tree>"
-
-    def __getitem__(self, key):
-        return self.tree[key]
-
-    def __setitem__(self, key, value):
-        self.tree[key] = value
-
-    def __len__(self):
-        return len(self.tree)
-
-
 def build(
     sources,
     targets,
@@ -123,7 +90,7 @@ def build(
     return np.array(tree, dtype=np.int64), depth, size
 
 
-def balance(octree):
+def balance(tree, depth):
     """
     Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
         (2012).
@@ -131,15 +98,14 @@ def balance(octree):
     Parameters:
     -----------
     octree : Octree
+    depth : int
 
     Returns:
     --------
     Octree
     """
 
-    depth = octree.depth
-
-    W = octree.tree
+    W = tree
 
     P = None
     balanced = None
@@ -226,7 +192,7 @@ def linearise(tree):
 
 def assign_points_to_keys(points, tree, x0, r0):
     """
-    Assign particle positions to Morton keys in a balanced tree.
+    Assign particle positions to Morton keys in a given tree.
 
     Parameters:
     -----------
@@ -234,7 +200,8 @@ def assign_points_to_keys(points, tree, x0, r0):
     tree : Octree
 
     Returns:
-    np.array(shape=(N,))
+    --------
+    np.array(shape=(N,), dtype=np.int64)
         Column vector specifying the Morton key of the node that each point is
         associated with.
     """
@@ -246,6 +213,7 @@ def assign_points_to_keys(points, tree, x0, r0):
 
     leaves = np.zeros(n_points, dtype=np.int64)
 
+    # Loop over all nodes to find bounds
     for i in range(n_keys):
         key = tree[i, 0]
         bounds = morton.find_node_bounds(key, x0, r0)

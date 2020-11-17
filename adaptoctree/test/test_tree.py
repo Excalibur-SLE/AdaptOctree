@@ -1,11 +1,8 @@
 """
 Test tree construction.
-
-
-Need some kind of test to ensure that all points are assigned. There's a
-relationship between maximum level and max number of particles per box that needs
-to observed.
 """
+import pytest
+
 
 def test_assign_points_to_keys():
     pass
