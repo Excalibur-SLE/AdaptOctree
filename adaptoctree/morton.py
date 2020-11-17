@@ -506,3 +506,35 @@ def find_parent(key):
     parent = parent | parent_level
 
     return parent
+
+
+def find_node_bounds(key, x0, r0):
+    """
+    Find the physical node (box) bounds, described by a given Morton key.
+
+    Parameters:
+    -----------
+    key : np.int64
+        Morton key.
+    x0 : np.array(shape=(3,), dtype=np.float32)
+        Center of root node of Octree.
+    r0 : np.float32
+        Half side length of root node.
+
+    Returns:
+    --------
+    np.array(shape=(3, 2), dtype=np.float32),
+        Bounds corresponding to (0, 0, 0) and (1, 1, 1) indices of a unit box.
+    """
+
+    center = find_center_from_key(key, x0, r0)
+
+    level = find_level(key)
+    radius = r0 / (1 << level)
+
+    displacement =  np.array([radius, radius, radius])
+
+    lower_bound = center - displacement
+    upper_bound = center + displacement
+
+    return np.vstack((lower_bound, upper_bound))

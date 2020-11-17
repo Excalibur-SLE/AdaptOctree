@@ -264,3 +264,17 @@ def test_find_parent(key, expected):
     result = morton.find_parent(key)
     assert result == expected
     assert isinstance(result, np.int64)
+
+
+@pytest.mark.parametrize(
+    "key, x0, r0, expected",
+    [
+        (
+            0, np.array([1, 1, 1]), 1, np.array([[0, 0, 0], [2, 2, 2]])
+        )
+    ]
+)
+def test_find_node_bounds(key, x0, r0, expected):
+    result = morton.find_node_bounds(key, x0, r0)
+
+    assert np.array_equal(result, expected)

@@ -1,120 +1,11 @@
 """
 Construct an adaptive linear octree form a set of points.
-
-Problems in implementation:
----------------------------
-
-1) Lists used in filtering for balancing algortihm for nodes at a give level.
-Can be fixed using another data structure holding an index pointer for a given
-level.
-2) Sibling checker involves a specific loop.
-3) Don't associate points with new nodes, this means that we can't construct
-another Octree class for the balanced tree. This can be done at the end, after
-the balanced nodes have been found - they can be 'filled'.
-
 """
+
 import numba
 import numpy as np
 
 import adaptoctree.morton as morton
-
-
-def balance(octree):
-    """
-    Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
-        (2012).
-
-    Parameters:
-    -----------
-    octree : Octree
-
-    Returns:
-    --------
-    Octree
-    """
-
-    depth = octree.depth
-
-    W = octree.tree
-
-    P = None
-    balanced = None
-
-    for level in range(depth, 0, -1):
-
-        # Working list, filtered to current level
-        Q = W[W[:,1] == level]
-
-        # Q.sort()
-        T = []
-        len_Q, _ = Q.shape
-        T_mask = np.zeros(len_Q, dtype=bool)
-
-        parents = set()
-
-        for i, q in enumerate(Q):
-            parent = morton.find_parent(q[0])
-            if parent not in parents:
-                T_mask[i] = True
-                parents.add(parent)
-
-        T = Q[T_mask]
-
-        for t in T:
-            siblings = morton.find_siblings(t[0])
-            neighbours = morton.find_neighbours(morton.find_parent(t[0]))
-
-            sibling_levels = morton.find_level(siblings)
-            neighbour_levels = morton.find_level(neighbours)
-
-            tmp_siblings = np.c_[siblings, sibling_levels]
-            tmp_neigbours = np.c_[neighbours, neighbour_levels]
-
-            if balanced is None:
-                balanced = tmp_siblings
-            else:
-                balanced = np.r_[balanced, tmp_siblings]
-
-            if P is None:
-                P = tmp_neigbours
-            else:
-                P = np.r_[P, tmp_neigbours]
-
-        # Remove duplicates in P, if they exist
-        P = np.r_[P, W[W[:,1]==(level-1)]]
-        if P.shape[0] > 0:
-            P = np.unique(P, axis=0)
-
-        W = np.r_[W, P]
-        P = None
-
-    # Sort and linearise
-    tmp = np.sort(balanced[:,0])
-    return linearise(tmp)
-
-
-def linearise(tree):
-    """
-    Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
-
-    Parameters:
-    -----------
-    tree : np.array(dtype=np.int64)
-
-    Returns:
-    --------
-    np.array(np.int64)
-    """
-
-    mask = np.zeros_like(tree, dtype=bool)
-
-    n_octants = tree.shape[0]
-
-    for i in range(n_octants-1):
-        if morton.not_ancestor(tree[i], tree[i-1]):
-            mask[i] = True
-
-    return tree[mask]
 
 
 class Octree:
@@ -122,7 +13,8 @@ class Octree:
 
     def __init__(self, sources, targets, maximum_level, maximum_particles):
 
-        self.tree, self.depth, self.size = build_tree(
+
+        self.tree, self.depth, self.size = build(
             sources=sources,
             targets=targets,
             maximum_level=maximum_level,
@@ -149,7 +41,7 @@ class Octree:
         return len(self.tree)
 
 
-def build_tree(
+def build(
     sources,
     targets,
     maximum_level,
@@ -214,7 +106,6 @@ def build_tree(
                 refined_targets.append(targets[target_idxs])
 
             else:
-                # Need to keep a track of for the level index pointer
                 leaf_index += 1
                 tree.append((leaf, level))
                 size += 1
@@ -229,4 +120,143 @@ def build_tree(
 
         level += 1
 
-    return np.array(tree), depth, size
+    return np.array(tree, dtype=np.int64), depth, size
+
+
+def balance(octree):
+    """
+    Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
+        (2012).
+
+    Parameters:
+    -----------
+    octree : Octree
+
+    Returns:
+    --------
+    Octree
+    """
+
+    depth = octree.depth
+
+    W = octree.tree
+
+    P = None
+    balanced = None
+
+    for level in range(depth, 0, -1):
+
+        # Working list, filtered to current level
+        Q = W[W[:,1] == level]
+
+        # Q.sort()
+        T = []
+        len_Q = Q.shape[0]
+        T_mask = np.zeros(len_Q, dtype=bool)
+
+        parents = set()
+
+        for i, q in enumerate(Q):
+            parent = morton.find_parent(q[0])
+            if parent not in parents:
+                T_mask[i] = True
+                parents.add(parent)
+
+        T = Q[T_mask]
+
+        for t in T:
+            siblings = morton.find_siblings(t[0])
+            neighbours = morton.find_neighbours(morton.find_parent(t[0]))
+
+            sibling_levels = morton.find_level(siblings)
+            neighbour_levels = morton.find_level(neighbours)
+
+            tmp_siblings = np.c_[siblings, sibling_levels]
+            tmp_neigbours = np.c_[neighbours, neighbour_levels]
+
+            if balanced is None:
+                balanced = tmp_siblings
+            else:
+                balanced = np.r_[balanced, tmp_siblings]
+
+            if P is None:
+                P = tmp_neigbours
+            else:
+                P = np.r_[P, tmp_neigbours]
+
+        # Remove duplicates in P, if they exist
+        P = np.r_[P, W[W[:,1]==(level-1)]]
+        if P.shape[0] > 0:
+            P = np.unique(P, axis=0)
+
+        W = np.r_[W, P]
+        P = None
+
+    # Sort and linearise
+    tmp = np.sort(balanced[:,0])
+    linearised = linearise(tmp)
+    levels = morton.find_level(linearised)
+    return np.c_[linearised, levels]
+
+
+def linearise(tree):
+    """
+    Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
+
+    Parameters:
+    -----------
+    tree : np.array(dtype=np.int64)
+
+    Returns:
+    --------
+    np.array(np.int64)
+    """
+
+    mask = np.zeros_like(tree, dtype=bool)
+
+    n_octants = tree.shape[0]
+
+    for i in range(n_octants-1):
+        if morton.not_ancestor(tree[i], tree[i-1]):
+            mask[i] = True
+
+    mask[-1] = True
+    return tree[mask]
+
+
+def assign_points_to_keys(points, tree, x0, r0):
+    """
+    Assign particle positions to Morton keys in a balanced tree.
+
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3), dtype=np.float32)
+    tree : Octree
+
+    Returns:
+    np.array(shape=(N,))
+        Column vector specifying the Morton key of the node that each point is
+        associated with.
+    """
+    # Map Morton key to bounds that they represent.
+    n_points = points.shape[0]
+    n_keys = tree.shape[0]
+    lower_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
+    upper_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
+
+    leaves = np.zeros(n_points, dtype=np.int64)
+
+    for i in range(n_keys):
+        key = tree[i, 0]
+        bounds = morton.find_node_bounds(key, x0, r0)
+        lower_bounds[i:i+2, :] = bounds[0, :]
+        upper_bounds[i: i+2, :] = bounds[1, :]
+
+    # Loop over points, and assign to a node from the tree by examining the bounds
+    for i, point in enumerate(points):
+        upper_bound_index = np.all(point < upper_bounds, axis=1)
+        lower_bound_index = np.all(point >= lower_bounds, axis=1)
+        leaf_index = upper_bound_index & lower_bound_index
+        leaves[i] = tree[:, 0][leaf_index]
+
+    return leaves
