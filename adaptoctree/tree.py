@@ -182,11 +182,23 @@ def linearise(tree):
 
     n_octants = tree.shape[0]
 
-    for i in range(n_octants-1):
-        if morton.not_ancestor(tree[i], tree[i-1]):
+    for i in range(n_octants):
+        contained = False
+        for j in range(n_octants):
+            if i != j:
+                # Check if ancestor contained in mask
+                if not morton.not_ancestor(tree[i], tree[j]):
+                    contained = True
+                    mask[i] = True
+
+            if contained:
+                mask[i] = False
+                break
+
+        if not contained:
             mask[i] = True
 
-    mask[-1] = True
+    print(mask)
     return tree[mask]
 
 
@@ -225,6 +237,7 @@ def assign_points_to_keys(points, tree, x0, r0):
         upper_bound_index = np.all(point < upper_bounds, axis=1)
         lower_bound_index = np.all(point >= lower_bounds, axis=1)
         leaf_index = upper_bound_index & lower_bound_index
+
         leaves[i] = tree[:, 0][leaf_index]
 
     return leaves

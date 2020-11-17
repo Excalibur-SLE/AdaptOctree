@@ -128,6 +128,7 @@ def find_center(max_bound, min_bound):
     min_bound : np.array(shape=(3,), dtype=np.float32)
 
     Returns:
+    --------
     np.array(shape=(3,), dtype=np.float32)
     """
     center = (min_bound + max_bound) / 2
@@ -538,3 +539,25 @@ def find_node_bounds(key, x0, r0):
     upper_bound = center + displacement
 
     return np.vstack((lower_bound, upper_bound))
+
+
+def are_neighbours(a, b, x0, r0):
+    """
+    Check if octants a and b are neighbours
+    """
+
+    if not_ancestor(a, b) and not_ancestor(b, a):
+        level_a = find_level(a)
+        level_b = find_level(b)
+
+        radius_a = r0 / (1 << level_a)
+        radius_b = r0 / (1 << level_b)
+
+        center_a = find_center_from_key(a, x0, r0)
+        center_b = find_center_from_key(b, x0, r0)
+
+        if np.linalg.norm(center_a-center_b) <= np.sqrt(3)*(radius_b+radius_a):
+            return True
+        return False
+
+    return False

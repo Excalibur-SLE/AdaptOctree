@@ -278,3 +278,19 @@ def test_find_node_bounds(key, x0, r0, expected):
     result = morton.find_node_bounds(key, x0, r0)
 
     assert np.array_equal(result, expected)
+
+
+@pytest.mark.parametrize(
+    "a, b, expected",
+    [
+        # (1, 229377, True),
+        (2, 2064386, False)
+    ]
+)
+def test_are_neighbours(a, b, expected):
+    octree_center = np.array([0.5, 0.5, 0.5])
+    octree_radius = 0.5
+
+    result = morton.are_neighbours(a, b, octree_center, octree_radius)
+
+    assert result == expected

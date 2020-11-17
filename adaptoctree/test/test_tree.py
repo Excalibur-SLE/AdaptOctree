@@ -25,7 +25,7 @@ def maximum_level():
 
 @pytest.fixture
 def maximum_particles():
-    return 112
+    return 10
 
 
 @pytest.fixture
@@ -82,16 +82,24 @@ def test_particle_constraint(
     assert np.all(counts_balanced < maximum_particles)
 
 
-def test_assign_points_to_keys():
-    pass
+@pytest.mark.parametrize(
+    "unlinearised, expected",
+    [
+        (
+            np.array([1, 2, 1, 2]), np.array([1, 2])
+        )
+    ]
+)
+def test_linearise(unlinearised, expected):
+    result = tree.linearise(unlinearised)
+    assert np.array_equal(result, expected)
 
 
-def test_linearise():
-    pass
+def test_tree_balancing(balanced, octree_center, octree_radius):
 
+    for key_i, level_i in balanced:
+        for key_j, level_j in balanced:
+            if key_i != key_j:
+                if morton.are_neighbours(key_i, key_j, octree_center, octree_radius):
+                    assert abs(level_i-level_j) <= 1
 
-def test_tree_balancing():
-    """
-    Test that 2:1 balancing is enforced.
-    """
-    pass
