@@ -86,7 +86,7 @@ def test_particle_constraint(
     "unlinearised, expected",
     [
         (
-            np.array([1, 2, 1, 2]), np.array([1, 2])
+            np.array([229377, 2064386]), np.array([2064386])
         )
     ]
 )

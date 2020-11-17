@@ -182,23 +182,11 @@ def linearise(tree):
 
     n_octants = tree.shape[0]
 
-    for i in range(n_octants):
-        contained = False
-        for j in range(n_octants):
-            if i != j:
-                # Check if ancestor contained in mask
-                if not morton.not_ancestor(tree[i], tree[j]):
-                    contained = True
-                    mask[i] = True
-
-            if contained:
-                mask[i] = False
-                break
-
-        if not contained:
+    for i in range(n_octants-1):
+        if morton.not_ancestor(tree[i], tree[i+1]):
             mask[i] = True
 
-    print(mask)
+    mask[-1] = True
     return tree[mask]
 
 
