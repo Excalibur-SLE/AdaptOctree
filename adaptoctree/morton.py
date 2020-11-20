@@ -377,6 +377,48 @@ def not_ancestor(a, b):
     return bool(a^b)
 
 
+def find_children(key):
+    """
+    Find children of key
+    """
+    # Remove level bits
+    level = find_level(key)
+    key = key >> LEVEL_DISPLACEMENT
+
+    # Find first child
+    child = key << 3
+    child = child << LEVEL_DISPLACEMENT
+    child = child | (level + 1)
+
+    # Return siblings of first child
+    return find_siblings(child)
+
+
+def find_descendents(key, N):
+    """
+    Find all descendents N levels down tree from key
+    """
+    if N == 0:
+        return []
+
+    descendents = list(find_children(key))
+
+    previous_left_idx = 0
+
+    for i in range(N-1):
+        tmp = []
+        left_idx = previous_left_idx
+        right_idx = 8**(i+1) + left_idx
+        for d in descendents[left_idx:right_idx]:
+            tmp.extend(list(find_children(d)))
+
+        previous_left_idx = right_idx
+
+        descendents.extend(tmp)
+
+
+    return descendents[previous_left_idx:]
+
 def find_siblings(key):
     """
     Find the siblings of key.
@@ -561,3 +603,9 @@ def are_neighbours(a, b, x0, r0):
         return False
 
     return False
+
+
+def relative_to_absolute_anchor(relative_anchor, max_level):
+
+    level_difference = max_level - relative_anchor[3]
+    return relative_anchor[:3]*(2**level_difference)

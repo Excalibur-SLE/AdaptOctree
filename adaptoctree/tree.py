@@ -90,7 +90,7 @@ def build(
     return np.array(tree, dtype=np.int64), depth, size
 
 
-def balance(tree, depth):
+def balance(tree, depth, max_level):
     """
     Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
         (2012).
@@ -109,85 +109,56 @@ def balance(tree, depth):
 
     P = None
     balanced = None
+    R = None
 
     for level in range(depth, 0, -1):
 
         # Working list, filtered to current level
         Q = W[W[:,1] == level]
 
-        # Q.sort()
-        T = []
-        len_Q = Q.shape[0]
-        T_mask = np.zeros(len_Q, dtype=bool)
+        # Find if neighbours of leaves at this level violate balance constraint
+        for q in Q:
+            neighbours = morton.find_neighbours(q[0])
 
-        parents = set()
+            # Invalid neighbours are any that are more than two levels coarse than the current level
+            invalid_neighbours = []
+            for neighbour in neighbours:
+                for invalid_level in range(level-2, 0, -1):
+                    # remove level bits
+                    invalid_neighbour = neighbour >> 15
+                    # add bits for invalid level key
+                    invalid_neighbour = invalid_neighbour >> (3*(level-invalid_level))
 
-        for i, q in enumerate(Q):
-            parent = morton.find_parent(q[0])
-            if parent not in parents:
-                T_mask[i] = True
-                parents.add(parent)
+                    # add new level bits
+                    invalid_neighbour = invalid_neighbour << 15
+                    invalid_neighbour = invalid_neighbour | invalid_level
+                    invalid_neighbours.append(invalid_neighbour)
 
-        T = Q[T_mask]
+            invalid_neighbours = np.unique(invalid_neighbours)
+            found, invalid_neighbours_idx, W_idx = np.intersect1d(invalid_neighbours, W, return_indices=True)
 
-        for t in T:
-            siblings = morton.find_siblings(t[0])
-            neighbours = morton.find_neighbours(morton.find_parent(t[0]))
+            # Check if invalid neighbours exist in working list for this node,
+            # q, if so remove them and replace with valid descendents
+            # Within 1 level of coarseness of q
+            if not found.size==0:
+                for invalid_neighbour in invalid_neighbours:
+                    invalid_level = morton.find_level(invalid_neighbour)
+                    valid_children = morton.find_descendents(invalid_neighbour, invalid_level - (level+1))
+                    valid_children_levels = morton.find_level(np.array(valid_children))
 
-            sibling_levels = morton.find_level(siblings)
-            neighbour_levels = morton.find_level(neighbours)
+                    # Filter out from Q
+                    Q = Q[Q[:,0]!=invalid_neighbour]
 
-            tmp_siblings = np.c_[siblings, sibling_levels]
-            tmp_neigbours = np.c_[neighbours, neighbour_levels]
+                    # Add valid descendents to Q
+                    tmp = np.c_[valid_children, valid_children_levels]
+                    Q = np.r_[Q, tmp]
 
-            if balanced is None:
-                balanced = tmp_siblings
-            else:
-                balanced = np.r_[balanced, tmp_siblings]
+        if R is None:
+            R = Q
+        else:
+            R = np.r_[R, Q]
 
-            if P is None:
-                P = tmp_neigbours
-            else:
-                P = np.r_[P, tmp_neigbours]
-
-        # Remove duplicates in P, if they exist
-        P = np.r_[P, W[W[:,1]==(level-1)]]
-        if P.shape[0] > 0:
-            P = np.unique(P, axis=0)
-
-        W = np.r_[W, P]
-        P = None
-
-    # Sort and linearise
-    tmp = np.sort(balanced[:,0])
-    linearised = linearise(tmp)
-    levels = morton.find_level(linearised)
-    return np.c_[linearised, levels]
-
-
-def linearise(tree):
-    """
-    Remove overlaps in a sorted linear tree. Algorithm 7 in Sundar (2012).
-
-    Parameters:
-    -----------
-    tree : np.array(dtype=np.int64)
-
-    Returns:
-    --------
-    np.array(np.int64)
-    """
-
-    mask = np.zeros_like(tree, dtype=bool)
-
-    n_octants = tree.shape[0]
-
-    for i in range(n_octants-1):
-        if morton.not_ancestor(tree[i], tree[i+1]):
-            mask[i] = True
-
-    mask[-1] = True
-    return tree[mask]
+    return np.unique(R, axis=0)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
@@ -225,6 +196,15 @@ def assign_points_to_keys(points, tree, x0, r0):
         upper_bound_index = np.all(point < upper_bounds, axis=1)
         lower_bound_index = np.all(point >= lower_bounds, axis=1)
         leaf_index = upper_bound_index & lower_bound_index
+
+        if np.count_nonzero(leaf_index) != 1:
+            print(np.count_nonzero(leaf_index))
+            print(point)
+            print(tree[:, 0][leaf_index])
+            a, b = tree[:, 0][leaf_index]
+            print([morton.find_node_bounds(k, x0, r0) for k in tree[:, 0][leaf_index]])
+            print(morton.not_ancestor(a, b))
+            print()
 
         leaves[i] = tree[:, 0][leaf_index]
 

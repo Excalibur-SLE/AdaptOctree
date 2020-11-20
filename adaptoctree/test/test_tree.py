@@ -41,8 +41,8 @@ def unbalanced(sources, maximum_level, maximum_particles):
 
 
 @pytest.fixture
-def balanced(unbalanced):
-    return tree.balance(*unbalanced)
+def balanced(unbalanced, maximum_level):
+    return tree.balance(*unbalanced, maximum_level)
 
 
 @pytest.fixture
@@ -76,23 +76,11 @@ def test_particle_constraint(
     assigned_balanced = tree.assign_points_to_keys(
         sources, balanced, octree_center, octree_radius
         )
+
     _, counts_balanced = np.unique(assigned_balanced, return_counts=True)
 
     assert np.all(counts_unbalanced < maximum_particles)
     assert np.all(counts_balanced < maximum_particles)
-
-
-@pytest.mark.parametrize(
-    "unlinearised, expected",
-    [
-        (
-            np.array([229377, 2064386]), np.array([2064386])
-        )
-    ]
-)
-def test_linearise(unlinearised, expected):
-    result = tree.linearise(unlinearised)
-    assert np.array_equal(result, expected)
 
 
 def test_tree_balancing(balanced, octree_center, octree_radius):

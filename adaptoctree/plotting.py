@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-from adaptoctree.tree import linearise, balance, build
+from adaptoctree.tree import balance, build
 import adaptoctree.morton as morton
 
 
@@ -56,6 +56,19 @@ def plot_tree(octree, balanced, sources, octree_center, octree_radius):
     plt.show()
 
 
+
+def make_spiral(N):
+
+    theta = np.linspace(0, 2*np.pi, N)
+    phi = np.linspace(0, np.pi, N)
+
+    x = np.cos(theta)*np.sin(phi)
+    y = np.sin(theta)*np.sin(phi)
+    z = np.cos(phi)
+
+    return np.c_[x, y, z]
+
+
 def make_moon(npoints):
 
     x = np.linspace(0, 2*np.pi, npoints) + np.random.rand(npoints)
@@ -70,41 +83,48 @@ def main():
     np.random.seed(0)
 
     N = int(1000)
-    sources = targets = make_moon(N)
+    # sources = targets = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
+    sources = targets = make_spiral(N)
 
+    print("HERE", sources.shape)
     tree_conf = {
         "sources": sources,
         "targets": targets,
         "maximum_level": 10,
-        "maximum_particles": 150
+        "maximum_particles": 5
     }
 
-    maximum_level = 10
+    maximum_level = 5
     maximum_particles = 150
-
     max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
-    # Sort sources and targets by octant at level 1 of octree
     start = time.time()
-
     octree, depth, size = build(sources, targets, maximum_level, maximum_particles)
-    print(f"Adaptive tree construction runtime: {time.time() - start}")
+    print(f"Build runtime: {time.time()-start}")
 
     start = time.time()
-    balanced = balance(octree, depth)
+    balanced = balance(octree, depth, maximum_level)
     print(f"Balancing runtime: {time.time() - start}")
 
     original = octree
 
-    # plot_tree(original[:,0], balanced[:,0], sources, octree_center, octree_radius)
+    print(balanced.shape)
+    print(original.shape)
 
-    print("Original Tree ", octree.shape)
-    print()
-    print("Balanced Tree ", balanced.shape)
+    plot_tree(original[:,0], balanced[:,0], sources, octree_center, octree_radius)
 
+    # print("Original Tree ", octree.shape)
+    # print()
+    # print("Balanced Tree ", balanced.shape)
+
+    # print(octree)
+    # print()
+    # print(balanced)
+    # print()
+    # print(linearise(balanced[:,0]))
 
 if __name__ == "__main__":
     main()
