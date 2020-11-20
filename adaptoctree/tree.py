@@ -92,8 +92,7 @@ def build(
 
 def balance(tree, depth, max_level):
     """
-    Single-node sequential tree balancing. Based on Algorithm 8 in Sundar et al
-        (2012).
+    Single-node sequential tree balancing.
 
     Parameters:
     -----------
@@ -105,25 +104,30 @@ def balance(tree, depth, max_level):
     Octree
     """
 
-    W = tree
+    work_set = tree
 
-    P = None
     balanced = None
-    R = None
 
     for level in range(depth, 0, -1):
 
         # Working list, filtered to current level
-        Q = W[W[:,1] == level]
+        work_subset = work_set[work_set[:,1] == level]
 
         # Find if neighbours of leaves at this level violate balance constraint
-        for q in Q:
-            neighbours = morton.find_neighbours(q[0])
+
+        for key, _ in work_subset:
+            neighbours = morton.find_neighbours(key)
+            n_neighbours = len(neighbours)
 
             # Invalid neighbours are any that are more than two levels coarse than the current level
-            invalid_neighbours = []
+
+            n_invalid_neighbours = n_neighbours * (level-2)
+            invalid_neighbours = np.empty(shape=(n_invalid_neighbours), dtype=np.int64)
+
+            i = 0
             for neighbour in neighbours:
                 for invalid_level in range(level-2, 0, -1):
+
                     # remove level bits
                     invalid_neighbour = neighbour >> 15
                     # add bits for invalid level key
@@ -132,33 +136,35 @@ def balance(tree, depth, max_level):
                     # add new level bits
                     invalid_neighbour = invalid_neighbour << 15
                     invalid_neighbour = invalid_neighbour | invalid_level
-                    invalid_neighbours.append(invalid_neighbour)
+                    invalid_neighbours[i] = invalid_neighbour
+                    i += 1
 
             invalid_neighbours = np.unique(invalid_neighbours)
-            found, invalid_neighbours_idx, W_idx = np.intersect1d(invalid_neighbours, W, return_indices=True)
+            found, invalid_neighbours_idx, W_idx = np.intersect1d(invalid_neighbours, work_set, return_indices=True)
 
             # Check if invalid neighbours exist in working list for this node,
             # q, if so remove them and replace with valid descendents
             # Within 1 level of coarseness of q
-            if not found.size==0:
+            if found.size > 0:
                 for invalid_neighbour in invalid_neighbours:
                     invalid_level = morton.find_level(invalid_neighbour)
                     valid_children = morton.find_descendents(invalid_neighbour, invalid_level - (level+1))
                     valid_children_levels = morton.find_level(np.array(valid_children))
 
-                    # Filter out from Q
-                    Q = Q[Q[:,0]!=invalid_neighbour]
+                    # Filter out from W
+                    work_set = work_set[work_set[:,0]!=invalid_neighbour]
 
-                    # Add valid descendents to Q
+                    # Add valid descendents to W
                     tmp = np.c_[valid_children, valid_children_levels]
-                    Q = np.r_[Q, tmp]
+                    work_set = np.r_[work_set, tmp]
 
-        if R is None:
-            R = Q
+        if balanced is None:
+            balanced = work_subset
+
         else:
-            R = np.r_[R, Q]
+            balanced = np.r_[balanced, work_subset]
 
-    return np.unique(R, axis=0)
+    return np.unique(balanced, axis=0)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
