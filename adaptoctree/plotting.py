@@ -9,6 +9,61 @@ from adaptoctree.tree import balance, build
 import adaptoctree.morton as morton
 
 
+def export_to_vtk(leafs, fname, octree_center, octree_radius):
+    """Export tree to VTK."""
+    from pyevtk.hl import unstructuredGridToVTK
+    from pyevtk.vtk import VtkHexahedron
+
+    nleafs = len(leafs)
+    nvertices = nleafs * 8
+    connectivity = np.arange(nvertices)
+    vertices = np.empty((nvertices, 3), dtype=np.float64)
+    cell_data = {"Level": np.empty(nleafs, dtype=np.int32)}
+    offsets = 8 * np.arange(1, nleafs + 1)
+    cell_types = VtkHexahedron.tid * np.ones(nleafs)
+
+    for index, key in enumerate(leafs):
+        level = morton.find_level(key)
+        bounds = morton.find_node_bounds(key, octree_center, octree_radius)
+
+        vertices[8 * index + 0, :] = np.array(
+            [bounds[0, 0], bounds[0, 1], bounds[0, 2]]
+        )
+        vertices[8 * index + 1, :] = np.array(
+            [bounds[1, 0], bounds[0, 1], bounds[0, 2]]
+        )
+        vertices[8 * index + 2, :] = np.array(
+            [bounds[1, 0], bounds[1, 1], bounds[0, 2]]
+        )
+        vertices[8 * index + 3, :] = np.array(
+            [bounds[0, 0], bounds[1, 1], bounds[0, 2]]
+        )
+        vertices[8 * index + 4, :] = np.array(
+            [bounds[0, 0], bounds[0, 1], bounds[1, 2]]
+        )
+        vertices[8 * index + 5, :] = np.array(
+            [bounds[1, 0], bounds[0, 1], bounds[1, 2]]
+        )
+        vertices[8 * index + 6, :] = np.array(
+            [bounds[1, 0], bounds[1, 1], bounds[1, 2]]
+        )
+        vertices[8 * index + 7, :] = np.array(
+            [bounds[0, 0], bounds[1, 1], bounds[1, 2]]
+        )
+        cell_data["Level"][index] = level
+
+    unstructuredGridToVTK(
+        fname,
+        vertices[:, 0].copy(),
+        vertices[:, 1].copy(),
+        vertices[:, 2].copy(),
+        connectivity=connectivity,
+        offsets=offsets,
+        cell_types=cell_types,
+        cellData=cell_data,
+    )
+
+
 def plot_tree(octree, balanced, sources, octree_center, octree_radius):
     """
 
@@ -21,8 +76,8 @@ def plot_tree(octree, balanced, sources, octree_center, octree_radius):
 
     fig1 = plt.figure()
     fig2 = plt.figure()
-    ax1 = fig1.add_subplot(111, projection='3d')
-    ax2 = fig2.add_subplot(111, projection='3d')
+    ax1 = fig1.add_subplot(111, projection="3d")
+    ax2 = fig2.add_subplot(111, projection="3d")
 
     unique = []
 
@@ -34,9 +89,11 @@ def plot_tree(octree, balanced, sources, octree_center, octree_radius):
 
         r = [-radius, radius]
 
-        for s, e in itertools.combinations(np.array(list(itertools.product(r, r, r))), 2):
-            if np.sum(np.abs(s-e)) == r[1]-r[0]:
-                ax1.plot3D(*zip(s+center, e+center), color="b")
+        for s, e in itertools.combinations(
+            np.array(list(itertools.product(r, r, r))), 2
+        ):
+            if np.sum(np.abs(s - e)) == r[1] - r[0]:
+                ax1.plot3D(*zip(s + center, e + center), color="b")
 
     for node in balanced:
         level = morton.find_level(node)
@@ -46,24 +103,25 @@ def plot_tree(octree, balanced, sources, octree_center, octree_radius):
 
         r = [-radius, radius]
 
-        for s, e in itertools.combinations(np.array(list(itertools.product(r, r, r))), 2):
-            if np.sum(np.abs(s-e)) == r[1]-r[0]:
-                ax2.plot3D(*zip(s+center, e+center), color="b")
+        for s, e in itertools.combinations(
+            np.array(list(itertools.product(r, r, r))), 2
+        ):
+            if np.sum(np.abs(s - e)) == r[1] - r[0]:
+                ax2.plot3D(*zip(s + center, e + center), color="b")
 
     # Plot particle data
-    ax1.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
-    ax2.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c='g', s=0.8)
+    ax1.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c="g", s=0.8)
+    ax2.scatter(sources[:, 0], sources[:, 1], sources[:, 2], c="g", s=0.8)
     plt.show()
-
 
 
 def make_spiral(N):
 
-    theta = np.linspace(0, 2*np.pi, N)
+    theta = np.linspace(0, 2 * np.pi, N)
     phi = np.linspace(0, np.pi, N)
 
-    x = np.cos(theta)*np.sin(phi)
-    y = np.sin(theta)*np.sin(phi)
+    x = np.cos(theta) * np.sin(phi)
+    y = np.sin(theta) * np.sin(phi)
     z = np.cos(phi)
 
     return np.c_[x, y, z]
@@ -71,8 +129,8 @@ def make_spiral(N):
 
 def make_moon(npoints):
 
-    x = np.linspace(0, 2*np.pi, npoints) + np.random.rand(npoints)
-    y = 0.5*np.ones(npoints) + np.random.rand(npoints)
+    x = np.linspace(0, 2 * np.pi, npoints) + np.random.rand(npoints)
+    y = 0.5 * np.ones(npoints) + np.random.rand(npoints)
     z = np.sin(x) + np.random.rand(npoints)
 
     moon = np.array([x, y, z]).T
@@ -91,12 +149,14 @@ def main():
         "sources": sources,
         "targets": targets,
         "maximum_level": 10,
-        "maximum_particles": 5
+        "maximum_particles": 5,
     }
 
     maximum_level = 5
     maximum_particles = 150
-    max_bound, min_bound = morton.find_bounds(tree_conf['sources'], tree_conf['targets'])
+    max_bound, min_bound = morton.find_bounds(
+        tree_conf["sources"], tree_conf["targets"]
+    )
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
@@ -113,7 +173,7 @@ def main():
     print(balanced.shape)
     print(original.shape)
 
-    plot_tree(original[:,0], balanced[:,0], sources, octree_center, octree_radius)
+    plot_tree(original[:, 0], balanced[:, 0], sources, octree_center, octree_radius)
 
     # print("Original Tree ", octree.shape)
     # print()
@@ -124,6 +184,7 @@ def main():
     # print(balanced)
     # print()
     # print(linearise(balanced[:,0]))
+
 
 if __name__ == "__main__":
     main()

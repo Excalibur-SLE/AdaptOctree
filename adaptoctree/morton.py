@@ -93,36 +93,13 @@ def find_level(key):
 
 
 @numba.njit
-def find_bounds2(particles):
+def find_bounds(particles):
 
     min_bound = np.array(
         [np.min(particles[:, 0]), np.min(particles[:, 1]), np.min(particles[:, 2])]
     )
     max_bound = np.array(
         [np.max(particles[:, 0]), np.max(particles[:, 1]), np.max(particles[:, 2])]
-    )
-    return max_bound, min_bound
-
-
-def find_bounds(sources, targets):
-    """
-    Find the bounds of the Octree domain describing a set of sources and targets.
-
-    Parameters:
-    -----------
-    sources : np.array(shape=(N, 3), dtype=np.float64)
-    targets : np.array(shape=(N, 3), dtype=np.float64)
-
-    Returns:
-    --------
-    (np.array(shape=(3,), dtype=np.float64),
-        np.array(shape=(3,), dtype=np.float64))
-    """
-    min_bound = np.min(
-        np.vstack([np.min(sources, axis=0), np.min(targets, axis=0)]), axis=0
-    )
-    max_bound = np.max(
-        np.vstack([np.max(sources, axis=0), np.max(targets, axis=0)]), axis=0
     )
     return max_bound, min_bound
 
@@ -163,7 +140,7 @@ def find_radius(center, max_bound, min_bound):
     rad1 = np.max(center - min_bound)
     rad2 = np.max(max_bound - center)
     vals = np.array([rad1, rad2])
-    radius = np.max(vals)
+    radius = np.max(vals) * (1 + 1e-10)
     return radius
 
 
@@ -252,6 +229,43 @@ def encode_points(points, level, x0, r0):
     anchors[:, :3] = np.floor((points - xmin) / diameter).astype(np.int32)
 
     for i in range(npoints):
+        keys[i] = encode_anchor(anchors[i, :])
+
+    return keys
+
+
+@numba.njit(parallel=True)
+def encode_points_smt(points, level, x0, r0):
+    """
+    Apply morton encoding to a set of points, using multi-threading.
+
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3), dtype=np.float64)
+    level : np.uint16
+        Octree level of point.
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of root node of Octree.
+    r0 : np.float64
+        Half side length of root node.
+
+    Returns:
+    --------
+    np.array(shape=(N,), dtype=np.int64)
+    """
+
+    npoints, _ = points.shape
+    keys = np.empty(npoints, dtype=np.int64)
+
+    anchors = np.empty((npoints, 4), dtype=np.int32)
+    anchors[:, 3] = level
+
+    xmin = x0 - r0
+    diameter = 2 * r0 / (1 << level)
+
+    anchors[:, :3] = np.floor((points - xmin) / diameter).astype(np.int32)
+
+    for i in numba.prange(npoints):
         keys[i] = encode_anchor(anchors[i, :])
 
     return keys
@@ -592,7 +606,7 @@ def find_node_bounds(key, x0, r0):
 
     Returns:
     --------
-    np.array(shape=(3, 2), dtype=np.float64),
+    np.array(shape=(2, 3), dtype=np.float64),
         Bounds corresponding to (0, 0, 0) and (1, 1, 1) indices of a unit box.
     """
 
