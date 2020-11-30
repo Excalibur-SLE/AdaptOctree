@@ -21,10 +21,10 @@ from adaptoctree.morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
 LEVEL_DISPLACEMENT = 15
 
 # Mask for last 15 bits
-LEVEL_MASK = 0x7fff
+LEVEL_MASK = 0x7FFF
 
 # Mask for a lowest order byte
-BYTE_MASK = 0xff
+BYTE_MASK = 0xFF
 BYTE_DISPLACEMENT = 8
 
 # Mask for lowest order index bits
@@ -38,22 +38,19 @@ def find_center_from_anchor(anchor, x0, r0):
     Parameters:
     -----------
     anchor : np.array(shape=(4,), dtype=np.int32)
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
     --------
-    np.array(shape=(3,), dtype=np.float32)
+    np.array(shape=(3,), dtype=np.float64)
     """
 
     xmin = x0 - r0
     level = anchor[3]
     side_length = 2 * r0 / (1 << level)
-
-    side_length = np.float32(side_length)
-    anchor = anchor.astype(np.float32)
 
     return (anchor[:3] + 0.5) * side_length + xmin
 
@@ -66,9 +63,9 @@ def find_center_from_key(key, x0, r0):
     -----------
     key : np.int64
         Morton key.
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
@@ -95,19 +92,31 @@ def find_level(key):
     return key & LEVEL_MASK
 
 
+@numba.njit
+def find_bounds2(particles):
+
+    min_bound = np.array(
+        [np.min(particles[:, 0]), np.min(particles[:, 1]), np.min(particles[:, 2])]
+    )
+    max_bound = np.array(
+        [np.max(particles[:, 0]), np.max(particles[:, 1]), np.max(particles[:, 2])]
+    )
+    return max_bound, min_bound
+
+
 def find_bounds(sources, targets):
     """
     Find the bounds of the Octree domain describing a set of sources and targets.
 
     Parameters:
     -----------
-    sources : np.array(shape=(N, 3), dtype=np.float32)
-    targets : np.array(shape=(N, 3), dtype=np.float32)
+    sources : np.array(shape=(N, 3), dtype=np.float64)
+    targets : np.array(shape=(N, 3), dtype=np.float64)
 
     Returns:
     --------
-    (np.array(shape=(3,), dtype=np.float32),
-        np.array(shape=(3,), dtype=np.float32))
+    (np.array(shape=(3,), dtype=np.float64),
+        np.array(shape=(3,), dtype=np.float64))
     """
     min_bound = np.min(
         np.vstack([np.min(sources, axis=0), np.min(targets, axis=0)]), axis=0
@@ -118,54 +127,59 @@ def find_bounds(sources, targets):
     return max_bound, min_bound
 
 
+@numba.njit
 def find_center(max_bound, min_bound):
     """
     Find center of an Octree domain described by a minimum and maximum bound.
 
     Parameters:
     -----------
-    max_bound : np.array(shape=(3,), dtype=np.float32)
-    min_bound : np.array(shape=(3,), dtype=np.float32)
+    max_bound : np.array(shape=(3,), dtype=np.float64)
+    min_bound : np.array(shape=(3,), dtype=np.float64)
 
     Returns:
     --------
-    np.array(shape=(3,), dtype=np.float32)
+    np.array(shape=(3,), dtype=np.float64)
     """
     center = (min_bound + max_bound) / 2
     return center
 
 
+@numba.njit
 def find_radius(center, max_bound, min_bound):
     """
     Find the half side length `radius' of an Octree's root node.
 
     Parameters:
     -----------
-    center : np.array(shape=(3,), dtype=np.float32)
-    max_bound : np.array(shape=(3,), dtype=np.float32)
-    min_bound : np.array(shape=(3,), dtype=np.float32)
+    center : np.array(shape=(3,), dtype=np.float64)
+    max_bound : np.array(shape=(3,), dtype=np.float64)
+    min_bound : np.array(shape=(3,), dtype=np.float64)
 
     Returns:
     --------
-    np.float32
+    np.float64
     """
-    factor = np.float32(1 + 1e-5)
-    radius = np.max([np.max(center - min_bound), np.max(max_bound - center)]) * factor
+    rad1 = np.max(center - min_bound)
+    rad2 = np.max(max_bound - center)
+    vals = np.array([rad1, rad2])
+    radius = np.max(vals)
     return radius
 
 
+@numba.njit
 def point_to_anchor(point, level, x0, r0):
     """
     Find the anchor of the octant in which a 3D Cartesian point lies.
 
     Parameters:
     -----------
-    point : np.array(shape=(3,), dtype=np.float32)
+    point : np.array(shape=(3,), dtype=np.float64)
     level : np.int32
         Octree level of point.
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
@@ -183,17 +197,18 @@ def point_to_anchor(point, level, x0, r0):
     return anchor
 
 
+@numba.njit
 def encode_point(point, level, x0, r0):
     """
     Apply Morton encoding to a point.
 
     Parameters:
     -----------
-    point : np.array(shape=(3,), dtype=np.float32)
+    point : np.array(shape=(3,), dtype=np.float64)
     level : np.int32
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
@@ -205,18 +220,19 @@ def encode_point(point, level, x0, r0):
     return encode_anchor(anchor)
 
 
+@numba.njit
 def encode_points(points, level, x0, r0):
     """
     Apply morton encoding to a set of points.
 
     Parameters:
     -----------
-    points : np.array(shape=(N, 3), dtype=np.float32)
+    points : np.array(shape=(N, 3), dtype=np.float64)
     level : np.uint16
         Octree level of point.
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
@@ -241,6 +257,7 @@ def encode_points(points, level, x0, r0):
     return keys
 
 
+@numba.njit
 def encode_anchor(anchor):
     """
     Morton encode a set of anchor coordinates and their octree level. Assume a
@@ -265,8 +282,17 @@ def encode_anchor(anchor):
     key = np.int64(0)
 
     # Find interleaving
-    key = Z_LOOKUP[(z >> BYTE_DISPLACEMENT) & BYTE_MASK] | Y_LOOKUP[(y >> BYTE_DISPLACEMENT) & BYTE_MASK] | X_LOOKUP[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
-    key = (key << 24) | Z_LOOKUP[z & BYTE_MASK] | Y_LOOKUP[y & BYTE_MASK] | X_LOOKUP[x & BYTE_MASK]
+    key = (
+        Z_LOOKUP[(z >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | Y_LOOKUP[(y >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | X_LOOKUP[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
+    )
+    key = (
+        (key << 24)
+        | Z_LOOKUP[z & BYTE_MASK]
+        | Y_LOOKUP[y & BYTE_MASK]
+        | X_LOOKUP[x & BYTE_MASK]
+    )
 
     # Append level
     key = key << LEVEL_DISPLACEMENT
@@ -275,6 +301,7 @@ def encode_anchor(anchor):
     return key
 
 
+@numba.njit
 def encode_anchors(anchors):
     """
     Morton encode a set of anchors.
@@ -328,7 +355,7 @@ def decode_key(key):
         return ans
 
     x = extract(key)
-    x =  x | (extract((key >> 24)) << BYTE_DISPLACEMENT)
+    x = x | (extract((key >> 24)) << BYTE_DISPLACEMENT)
 
     y = extract(key >> 1)
     y = y | (extract((key >> 25)) << BYTE_DISPLACEMENT)
@@ -364,7 +391,7 @@ def not_ancestor(a, b):
     if (level_a == level_b) and (a != b):
         return True
 
-    if (level_a > level_b):
+    if level_a > level_b:
         return True
 
     # Remove level offset
@@ -372,9 +399,9 @@ def not_ancestor(a, b):
     b = b >> LEVEL_DISPLACEMENT
 
     # Check remaining bits of a against b
-    b = b >> (3*(level_b - level_a))
+    b = b >> (3 * (level_b - level_a))
 
-    return bool(a^b)
+    return bool(a ^ b)
 
 
 def find_children(key):
@@ -405,10 +432,10 @@ def find_descendents(key, N):
 
     previous_left_idx = 0
 
-    for i in range(N-1):
+    for i in range(N - 1):
         tmp = []
         left_idx = previous_left_idx
-        right_idx = 8**(i+1) + left_idx
+        right_idx = 8 ** (i + 1) + left_idx
         for d in descendents[left_idx:right_idx]:
             tmp.extend(list(find_children(d)))
 
@@ -416,8 +443,8 @@ def find_descendents(key, N):
 
         descendents.extend(tmp)
 
-
     return descendents[previous_left_idx:]
+
 
 def find_siblings(key):
     """
@@ -433,9 +460,7 @@ def find_siblings(key):
     np.array(shape=(8,), dtype=np.int64)
     """
 
-    suffixes = np.array([
-        0, 1, 2, 3, 4, 5, 6, 7
-    ], dtype=np.int64)
+    suffixes = np.array([0, 1, 2, 3, 4, 5, 6, 7], dtype=np.int64)
 
     # Extract and remove level bits
     level = find_level(key)
@@ -448,7 +473,7 @@ def find_siblings(key):
 
     for i, suffix in enumerate(suffixes):
         sibling = root | suffix
-        sibling = ((sibling << LEVEL_DISPLACEMENT) | level)
+        sibling = (sibling << LEVEL_DISPLACEMENT) | level
         siblings[i] = sibling
 
     return siblings
@@ -478,14 +503,13 @@ def not_sibling(a, b):
     if level_a != level_b:
         return True
 
-    # Remove level, and smallest degree bits
-    a = a >> (LEVEL_DISPLACEMENT+3)
-    b = b >> (LEVEL_DISPLACEMENT+3)
+    #  Remove level, and smallest degree bits
+    a = a >> (LEVEL_DISPLACEMENT + 3)
+    b = b >> (LEVEL_DISPLACEMENT + 3)
 
-    # Check if a and b share same root
-    root_not_same = a^b
+    #  Check if a and b share same root
+    root_not_same = a ^ b
     return bool(root_not_same)
-
 
 
 def find_neighbours(key):
@@ -513,9 +537,11 @@ def find_neighbours(key):
     for i in range(-1, 2):
         for j in range(-1, 2):
             for k in range(-1, 2):
-                neighbour_anchor = np.array([x+i, y+j, z+k, level])
+                neighbour_anchor = np.array([x + i, y + j, z + k, level])
 
-                if ((np.any(neighbour_anchor < 0)) or (np.any(neighbour_anchor >= max_index))):
+                if (np.any(neighbour_anchor < 0)) or (
+                    np.any(neighbour_anchor >= max_index)
+                ):
                     pass
                 else:
                     neighbours.append(encode_anchor(neighbour_anchor))
@@ -559,14 +585,14 @@ def find_node_bounds(key, x0, r0):
     -----------
     key : np.int64
         Morton key.
-    x0 : np.array(shape=(3,), dtype=np.float32)
+    x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
-    r0 : np.float32
+    r0 : np.float64
         Half side length of root node.
 
     Returns:
     --------
-    np.array(shape=(3, 2), dtype=np.float32),
+    np.array(shape=(3, 2), dtype=np.float64),
         Bounds corresponding to (0, 0, 0) and (1, 1, 1) indices of a unit box.
     """
 
@@ -575,7 +601,7 @@ def find_node_bounds(key, x0, r0):
     level = find_level(key)
     radius = r0 / (1 << level)
 
-    displacement =  np.array([radius, radius, radius])
+    displacement = np.array([radius, radius, radius])
 
     lower_bound = center - displacement
     upper_bound = center + displacement
@@ -598,7 +624,7 @@ def are_neighbours(a, b, x0, r0):
         center_a = find_center_from_key(a, x0, r0)
         center_b = find_center_from_key(b, x0, r0)
 
-        if np.linalg.norm(center_a-center_b) <= np.sqrt(3)*(radius_b+radius_a):
+        if np.linalg.norm(center_a - center_b) <= np.sqrt(3) * (radius_b + radius_a):
             return True
         return False
 
@@ -608,4 +634,4 @@ def are_neighbours(a, b, x0, r0):
 def relative_to_absolute_anchor(relative_anchor, max_level):
 
     level_difference = max_level - relative_anchor[3]
-    return relative_anchor[:3]*(2**level_difference)
+    return relative_anchor[:3] * (2 ** level_difference)
