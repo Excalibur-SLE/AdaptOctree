@@ -11,10 +11,15 @@ Conventions:
 5. The reason for using signed ints over unsigned ints is technical, and related
 to Python's handling of shift operators for unsigned integers.
 """
+import sys
+
 import numba
 import numpy as np
 
-from adaptoctree.morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
+from adaptoctree.morton_lookup import (
+    X_LOOKUP_ENCODE, Y_LOOKUP_ENCODE, Z_LOOKUP_ENCODE,
+    X_LOOKUP_DECODE, Y_LOOKUP_DECODE, Z_LOOKUP_DECODE
+    )
 
 
 # Number of bits used for level information
@@ -26,6 +31,7 @@ LEVEL_MASK = 0x7FFF
 # Mask for a lowest order byte
 BYTE_MASK = 0xFF
 BYTE_DISPLACEMENT = 8
+NINE_BIT_MASK = 0x1FF
 
 # Mask for lowest order index bits
 LOWEST_ORDER_MASK = 0x7
@@ -75,7 +81,7 @@ def find_center_from_key(key, x0, r0):
     anchor = decode_key(key)
     return find_center_from_anchor(anchor, x0, r0)
 
-
+@numba.njit
 def find_level(key):
     """
     Find the last 15 bits of a key, corresponding to a level.
@@ -89,6 +95,7 @@ def find_level(key):
     --------
     np.int64
     """
+
     return key & LEVEL_MASK
 
 
@@ -297,15 +304,15 @@ def encode_anchor(anchor):
 
     # Find interleaving
     key = (
-        Z_LOOKUP[(z >> BYTE_DISPLACEMENT) & BYTE_MASK]
-        | Y_LOOKUP[(y >> BYTE_DISPLACEMENT) & BYTE_MASK]
-        | X_LOOKUP[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        Z_LOOKUP_ENCODE[(z >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | Y_LOOKUP_ENCODE[(y >> BYTE_DISPLACEMENT) & BYTE_MASK]
+        | X_LOOKUP_ENCODE[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
     )
     key = (
         (key << 24)
-        | Z_LOOKUP[z & BYTE_MASK]
-        | Y_LOOKUP[y & BYTE_MASK]
-        | X_LOOKUP[x & BYTE_MASK]
+        | Z_LOOKUP_ENCODE[z & BYTE_MASK]
+        | Y_LOOKUP_ENCODE[y & BYTE_MASK]
+        | X_LOOKUP_ENCODE[x & BYTE_MASK]
     )
 
     # Append level
@@ -313,6 +320,30 @@ def encode_anchor(anchor):
     key = key | level
 
     return key
+
+
+def decode_key_helper(key, lookup_table, start_shift):
+
+    n_loops = 7 # 8 bytes in 64 bit key
+
+    coord = 0
+
+    for i in range(n_loops):
+        coord |= lookup_table[(key >> ((i * 9) + start_shift)) & NINE_BIT_MASK] << (3*i)
+
+    return coord
+
+
+def decode_key_lookup(key):
+
+    level = find_level(key)
+    key = key >> LEVEL_DISPLACEMENT
+
+    x = decode_key_helper(key, X_LOOKUP_DECODE, 0)
+    y = decode_key_helper(key, Y_LOOKUP_DECODE, 0)
+    z = decode_key_helper(key, Z_LOOKUP_DECODE, 0)
+
+    return np.array([x, y, z, level], np.int16)
 
 
 @numba.njit
@@ -337,6 +368,7 @@ def encode_anchors(anchors):
     return keys
 
 
+@numba.njit
 def decode_key(key):
     """
     Decode a Morton encoded key, return an anchor. The strategy is to examine
@@ -526,9 +558,42 @@ def not_sibling(a, b):
     return bool(root_not_same)
 
 
+NEIGHBOUR_IDXS = np.array([
+    [-1, -1, -1],
+    [-1, -1,  0],
+    [-1, -1,  1],
+    [-1,  0, -1],
+    [-1,  0,  0],
+    [-1,  0,  1],
+    [-1,  1, -1],
+    [-1,  1,  0],
+    [-1,  1,  1],
+    [ 0, -1, -1],
+    [ 0, -1,  0],
+    [ 0, -1,  1],
+    [ 0,  0, -1],
+    [ 0,  0,  0],
+    [ 0,  0,  1],
+    [ 0,  1, -1],
+    [ 0,  1,  0],
+    [ 0,  1,  1],
+    [ 1, -1, -1],
+    [ 1, -1,  0],
+    [ 1, -1,  1],
+    [ 1,  0, -1],
+    [ 1,  0,  0],
+    [ 1,  0,  1],
+    [ 1,  1, -1],
+    [ 1,  1,  0],
+    [ 1,  1,  1]],
+    dtype=np.int16
+    )
+
+
+@numba.njit
 def find_neighbours(key):
     """
-    Find all potential neighbours of an octant.
+    Find all potential neighbours of an octant at the same level.
 
     Parameters:
     -----------
@@ -545,22 +610,16 @@ def find_neighbours(key):
     y = anchor[1]
     z = anchor[2]
     level = anchor[3]
-    max_index = 1 << level
+    max_index = np.int16(1 << level)
 
-    neighbours = []
-    for i in range(-1, 2):
-        for j in range(-1, 2):
-            for k in range(-1, 2):
-                neighbour_anchor = np.array([x + i, y + j, z + k, level])
+    neighbours = np.zeros(shape=(27), dtype=np.int64)
+    neighbour_idx = 0
+    for i, j, k in NEIGHBOUR_IDXS:
+        if (0<= x+i < max_index) and (0 <= y+j < max_index) and (0 <= z+k < max_index):
+            neighbours[neighbour_idx] = encode_anchor(np.array([x + i, y + j, z + k, level]))
+            neighbour_idx += 1
 
-                if (np.any(neighbour_anchor < 0)) or (
-                    np.any(neighbour_anchor >= max_index)
-                ):
-                    pass
-                else:
-                    neighbours.append(encode_anchor(neighbour_anchor))
-
-    neighbours = np.array(neighbours)
+    neighbours = neighbours[:neighbour_idx]
     neighbours = neighbours[neighbours != key]
     return neighbours
 
@@ -649,3 +708,20 @@ def relative_to_absolute_anchor(relative_anchor, max_level):
 
     level_difference = max_level - relative_anchor[3]
     return relative_anchor[:3] * (2 ** level_difference)
+
+
+def main():
+
+    # anchor = np.array([13,22,38,4], dtype=np.int32)
+    # key = encode_anchor(anchor)
+    # print("original ", anchor)
+    # print("key: ", key)
+    # print("decoded ", decode_key_lookup(key))
+    # pass
+
+    key = 1
+    print(find_neighbours(key))
+
+
+if __name__ == "__main__":
+    main()

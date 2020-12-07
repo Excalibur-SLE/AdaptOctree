@@ -97,6 +97,23 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
+@numba.njit
+def compare_level(node_level, level):
+    return node_level == level
+
+
+def filter_tree(tree, level):
+    filtered = np.empty_like(tree)
+    j = 0
+    for i in range(len(tree)):
+        node_level = morton.find_level(tree[i])
+        if compare_level(node_level, level):
+            filtered[j] = tree[i]
+            j += 1
+    return filtered[:j]
+
+
+# @profile
 def balance(unbalanced_tree, depth, max_level):
     """
     Single-node sequential tree balancing.
@@ -110,18 +127,14 @@ def balance(unbalanced_tree, depth, max_level):
     --------
     Octree
     """
-    from adaptoctree.morton import find_level
 
     work_set = unbalanced_tree.copy()
 
     balanced = None
-    for level in range(depth, 0, -1):
+    for level in range(depth, 1, -1):
 
         # Working list, filtered to current level
-        filter_fun = lambda elem: find_level(elem) == level
-        work_subset = filter(filter_fun, work_set)
-        # work_subset = work_set[work_set[:, 1] == level]
-
+        work_subset = filter_tree(work_set, level)
         # Find if neighbours of leaves at this level violate balance constraint
 
         for key in work_subset:
@@ -129,12 +142,13 @@ def balance(unbalanced_tree, depth, max_level):
             n_neighbours = len(neighbours)
 
             # Invalid neighbours are any that are more than two levels coarse than the current level
-
             n_invalid_neighbours = n_neighbours * (level - 2)
             invalid_neighbours = np.empty(shape=(n_invalid_neighbours), dtype=np.int64)
 
             i = 0
             for neighbour in neighbours:
+
+                # This can be a numba function, process neighbours
                 for invalid_level in range(level - 2, 0, -1):
 
                     # remove level bits
@@ -151,7 +165,9 @@ def balance(unbalanced_tree, depth, max_level):
                     i += 1
 
             invalid_neighbours = np.unique(invalid_neighbours)
-            found, invalid_neighbours_idx, W_idx = np.intersect1d(
+
+            ## Check for faster way of computing this numpy logic
+            found, invalid_neighbours_idx, workset_idx = np.intersect1d(
                 invalid_neighbours, work_set, return_indices=True
             )
 
@@ -160,15 +176,17 @@ def balance(unbalanced_tree, depth, max_level):
             # Within 1 level of coarseness of q
             if found.size > 0:
                 for invalid_neighbour in invalid_neighbours:
+
+                    # This bit can also be numba-fied
                     invalid_level = morton.find_level(invalid_neighbour)
                     valid_children = morton.find_descendents(
                         invalid_neighbour, invalid_level - (level + 1)
                     )
 
-                    #  Filter out from W
+                    #  Filter out from work set
                     work_set = work_set[work_set != invalid_neighbour]
 
-                    # Add valid descendents to W
+                    # Add valid descendents to work set
                     work_set = np.r_[work_set, valid_children]
 
         if balanced is None:
@@ -177,7 +195,9 @@ def balance(unbalanced_tree, depth, max_level):
         else:
             balanced = np.r_[balanced, work_subset]
 
-    return np.unique(balanced, axis=0)
+    if balanced is None:
+        balanced = work_set
+    return np.unique(balanced)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
@@ -217,14 +237,46 @@ def assign_points_to_keys(points, tree, x0, r0):
         leaf_index = upper_bound_index & lower_bound_index
 
         if np.count_nonzero(leaf_index) != 1:
-            print(np.count_nonzero(leaf_index))
-            print(point)
-            print(tree[:, 0][leaf_index])
             a, b = tree[:, 0][leaf_index]
-            print([morton.find_node_bounds(k, x0, r0) for k in tree[:, 0][leaf_index]])
-            print(morton.not_ancestor(a, b))
-            print()
-
         leaves[i] = tree[:, 0][leaf_index]
 
     return leaves
+
+
+def main():
+
+    import numpy as np
+    import morton
+    import time
+
+    # tree = np.array([1, 2, 3, 4, 5, 6])
+    # level = 1
+    # filtered = filter_np_nb(tree, level)
+    # # print(morton.find_level(tree))
+    # print(filtered)
+
+    n_particles = 100
+    particles = np.random.rand(n_particles, 3)
+    unbalanced = build(
+        particles=particles
+    )
+    depth = max(morton.find_level(unbalanced))
+    max_level = 16
+    balance(np.unique(unbalanced), depth, max_level)
+
+    n_particles = int(1e3)
+    particles = np.random.rand(n_particles, 3)
+    start = time.time()
+    unbalanced = build(particles)
+    print("build time: ", time.time()-start)
+
+    depth = max(morton.find_level(unbalanced))
+    max_level = 16
+    start = time.time()
+    unbalanced = np.unique(unbalanced)
+    balance(unbalanced, depth, max_level)
+    print("balance time: ", time.time()-start)
+
+
+if __name__ == "__main__":
+    main()
