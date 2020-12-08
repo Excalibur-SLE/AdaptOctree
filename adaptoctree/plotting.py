@@ -141,49 +141,29 @@ def main():
     np.random.seed(0)
 
     N = int(1000)
-    sources = targets = make_moon(N)
+    particles = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
     # sources = targets = make_spiral(N)
 
-    tree_conf = {
-        "sources": sources,
-        "targets": targets,
-        "maximum_level": 10,
-        "maximum_particles": 5,
-    }
+    maximum_level = 10
+    max_num_particles = 70
+    max_bound, min_bound = morton.find_bounds(particles)
 
-    maximum_level = 5
-    maximum_particles = 150
-    max_bound, min_bound = morton.find_bounds(
-        tree_conf["sources"], tree_conf["targets"]
-    )
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     start = time.time()
-    octree, depth, size = build(sources, targets, maximum_level, maximum_particles)
-    print(f"Build runtime: {time.time()-start}")
+    unbalanced = build(particles, max_num_particles=max_num_particles, maximum_level=maximum_level)
+    unbalanced = np.unique(unbalanced)
+    depth = max(morton.find_level(unbalanced))
 
-    start = time.time()
-    balanced = balance(octree, depth, maximum_level)
-    print(f"Balancing runtime: {time.time() - start}")
+    balanced = balance(unbalanced, depth, maximum_level)
 
-    original = octree
+    plot_tree(unbalanced, balanced, particles, octree_center, octree_radius)
 
-    print(balanced.shape)
-    print(original.shape)
-
-    plot_tree(original[:, 0], balanced[:, 0], sources, octree_center, octree_radius)
-
-    # print("Original Tree ", octree.shape)
-    # print()
-    # print("Balanced Tree ", balanced.shape)
-
-    # print(octree)
-    # print()
     # print(balanced)
     # print()
-    # print(linearise(balanced[:,0]))
+    # print(unbalanced)
 
 
 if __name__ == "__main__":

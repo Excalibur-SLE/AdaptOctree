@@ -322,6 +322,7 @@ def encode_anchor(anchor):
     return key
 
 
+@numba.njit
 def decode_key_helper(key, lookup_table, start_shift):
 
     n_loops = 7 # 8 bytes in 64 bit key
@@ -334,6 +335,7 @@ def decode_key_helper(key, lookup_table, start_shift):
     return coord
 
 
+@numba.njit
 def decode_key_lookup(key):
 
     level = find_level(key)
@@ -449,7 +451,8 @@ def not_ancestor(a, b):
 
     return bool(a ^ b)
 
-
+# @numba.njit
+@profile
 def find_children(key):
     """
     Find children of key
@@ -467,31 +470,28 @@ def find_children(key):
     return find_siblings(child)
 
 
+# @numba.njit
+# @profile
 def find_descendents(key, N):
     """
     Find all descendents N levels down tree from key
     """
-    if N == 0:
-        return []
-
-    descendents = list(find_children(key))
+    descendents = find_children(key)
 
     previous_left_idx = 0
 
     for i in range(N - 1):
-        tmp = []
         left_idx = previous_left_idx
         right_idx = 8 ** (i + 1) + left_idx
         for d in descendents[left_idx:right_idx]:
-            tmp.extend(list(find_children(d)))
+            descendents = np.hstack((descendents, find_children(d)))
 
         previous_left_idx = right_idx
-
-        descendents.extend(tmp)
 
     return descendents[previous_left_idx:]
 
 
+@numba.njit
 def find_siblings(key):
     """
     Find the siblings of key.
@@ -720,7 +720,7 @@ def main():
     # pass
 
     key = 1
-    print(find_neighbours(key))
+    print(find_children(key))
 
 
 if __name__ == "__main__":
