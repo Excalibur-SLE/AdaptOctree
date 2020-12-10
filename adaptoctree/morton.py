@@ -14,7 +14,11 @@ to Python's handling of shift operators for unsigned integers.
 import numba
 import numpy as np
 
-from adaptoctree.morton_lookup import X_LOOKUP, Y_LOOKUP, Z_LOOKUP
+from adaptoctree.morton_lookup import (
+    X_LOOKUP_ENCODE, X_LOOKUP_DECODE,
+    Y_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
+    Z_LOOKUP_ENCODE, Z_LOOKUP_DECODE
+)
 
 
 # Number of bits used for level information
@@ -29,6 +33,18 @@ BYTE_DISPLACEMENT = 8
 
 # Mask for lowest order index bits
 LOWEST_ORDER_MASK = 0x7
+
+# Mask encapsulating a byte
+NINE_BIT_MASK = 0x1FF
+
+# Masks for coordinate bits along specific axes in a int64 Morton key
+X_MASK = 0b001001001001001001001001001001001001001001001001
+Y_MASK = 0b010010010010010010010010010010010010010010010010
+Z_MASK = 0b100100100100100100100100100100100100100100100100
+
+YZ_MASK = 0b110110110110110110110110110110110110110110110110
+XZ_MASK = 0b101101101101101101101101101101101101101101101101
+XY_MASK = 0b011011011011011011011011011011011011011011011011
 
 
 def find_center_from_anchor(anchor, x0, r0):
@@ -79,6 +95,7 @@ def find_center_from_key(key, x0, r0):
     return find_center_from_anchor(anchor, x0, r0)
 
 
+@numba.jit
 def find_level(key):
     """
     Find the last 15 bits of a key, corresponding to a level.
@@ -95,6 +112,7 @@ def find_level(key):
     return key & LEVEL_MASK
 
 
+@numba.njit
 def find_bounds(sources, targets):
     """
     Find the bounds of the Octree domain describing a set of sources and targets.
@@ -118,6 +136,7 @@ def find_bounds(sources, targets):
     return max_bound, min_bound
 
 
+@numba.njit
 def find_center(max_bound, min_bound):
     """
     Find center of an Octree domain described by a minimum and maximum bound.
@@ -135,6 +154,7 @@ def find_center(max_bound, min_bound):
     return center
 
 
+@numba.njit
 def find_radius(center, max_bound, min_bound):
     """
     Find the half side length `radius' of an Octree's root node.
@@ -154,6 +174,7 @@ def find_radius(center, max_bound, min_bound):
     return radius
 
 
+@numba.njit
 def point_to_anchor(point, level, x0, r0):
     """
     Find the anchor of the octant in which a 3D Cartesian point lies.
@@ -183,6 +204,7 @@ def point_to_anchor(point, level, x0, r0):
     return anchor
 
 
+@numba.njit
 def encode_point(point, level, x0, r0):
     """
     Apply Morton encoding to a point.
@@ -205,6 +227,7 @@ def encode_point(point, level, x0, r0):
     return encode_anchor(anchor)
 
 
+@numba.njit
 def encode_points(points, level, x0, r0):
     """
     Apply morton encoding to a set of points.
@@ -241,6 +264,7 @@ def encode_points(points, level, x0, r0):
     return keys
 
 
+@numba.njit
 def encode_anchor(anchor):
     """
     Morton encode a set of anchor coordinates and their octree level. Assume a
@@ -265,8 +289,14 @@ def encode_anchor(anchor):
     key = np.int64(0)
 
     # Find interleaving
-    key = Z_LOOKUP[(z >> BYTE_DISPLACEMENT) & BYTE_MASK] | Y_LOOKUP[(y >> BYTE_DISPLACEMENT) & BYTE_MASK] | X_LOOKUP[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
-    key = (key << 24) | Z_LOOKUP[z & BYTE_MASK] | Y_LOOKUP[y & BYTE_MASK] | X_LOOKUP[x & BYTE_MASK]
+    key = Z_LOOKUP_ENCODE[(z >> BYTE_DISPLACEMENT) & BYTE_MASK] \
+        | Y_LOOKUP_ENCODE[(y >> BYTE_DISPLACEMENT) & BYTE_MASK] \
+        | X_LOOKUP_ENCODE[(x >> BYTE_DISPLACEMENT) & BYTE_MASK]
+
+    key = (key << 24) \
+        | Z_LOOKUP_ENCODE[z & BYTE_MASK] \
+        | Y_LOOKUP_ENCODE[y & BYTE_MASK] \
+        | X_LOOKUP_ENCODE[x & BYTE_MASK]
 
     # Append level
     key = key << LEVEL_DISPLACEMENT
@@ -275,6 +305,7 @@ def encode_anchor(anchor):
     return key
 
 
+@numba.njit
 def encode_anchors(anchors):
     """
     Morton encode a set of anchors.
@@ -296,6 +327,7 @@ def encode_anchors(anchors):
     return keys
 
 
+@numba.njit
 def decode_key(key):
     """
     Decode a Morton encoded key, return an anchor. The strategy is to examine
@@ -340,6 +372,49 @@ def decode_key(key):
     return anchor
 
 
+@numba.njit
+def decode_key_lut_helper(key, lookup_table, start_shift):
+    """
+    Helper method for Morton key decode method that uses lookup tables.
+
+    Parameters:
+    -----------
+    key : np.int64
+    lookup_table : np.array(shape=(512), dtype=np.int32)
+    start_shift : np.int32
+    """
+    n_loops = 7 # 8 bytes in 64 bit key
+    coord = 0
+
+    for i in range(n_loops):
+        coord |= lookup_table[(key >> ((i * 9) + start_shift)) & NINE_BIT_MASK] << (3*i)
+
+    return coord
+
+
+@numba.njit
+def decode_key_lut(key):
+    """
+    Decode a Morton key, return an anchor, using the provided lookup tables.
+
+    Parameters:
+    -----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.array(shape=(4,), dtype=npint16)
+    """
+    level = find_level(key)
+    key = key >> LEVEL_DISPLACEMENT
+
+    x = decode_key_lut_helper(key, X_LOOKUP_DECODE, 0)
+    y = decode_key_lut_helper(key, Y_LOOKUP_DECODE, 0)
+    z = decode_key_lut_helper(key, Z_LOOKUP_DECODE, 0)
+
+    return np.array([x, y, z, level], np.int16)
+
+
 def not_ancestor(a, b):
     """
     Check if octant a is not an ancestor of octant b.
@@ -377,6 +452,7 @@ def not_ancestor(a, b):
     return bool(a^b)
 
 
+@numba.njit
 def find_children(key):
     """
     Find children of key
@@ -394,31 +470,27 @@ def find_children(key):
     return find_siblings(child)
 
 
+@numba.njit
 def find_descendents(key, N):
     """
     Find all descendents N levels down tree from key
     """
-    if N == 0:
-        return []
-
-    descendents = list(find_children(key))
+    descendents = find_children(key)
 
     previous_left_idx = 0
 
-    for i in range(N-1):
-        tmp = []
+    for i in range(N - 1):
         left_idx = previous_left_idx
-        right_idx = 8**(i+1) + left_idx
+        right_idx = 8 ** (i + 1) + left_idx
         for d in descendents[left_idx:right_idx]:
-            tmp.extend(list(find_children(d)))
+            descendents = np.hstack((descendents, find_children(d)))
 
         previous_left_idx = right_idx
 
-        descendents.extend(tmp)
-
-
     return descendents[previous_left_idx:]
 
+
+@numba.njit
 def find_siblings(key):
     """
     Find the siblings of key.
@@ -488,40 +560,150 @@ def not_sibling(a, b):
 
 
 
-def find_neighbours(key):
+@numba.njit
+def decrement_x(key):
     """
-    Find all potential neighbours of an octant.
+    Decrement a Morton Key in the x direction.
 
     Parameters:
-    -----------
+    ----------
     key : np.int64
-        Morton key
 
     Returns:
     --------
-    np.array(shape=(N_neighbours,), dtype=np.int64)
-        Array of neighbours' Morton keys, excluding the key itself.
+    np.int64
     """
-    anchor = decode_key(key)
-    x = anchor[0]
-    y = anchor[1]
-    z = anchor[2]
-    level = anchor[3]
-    max_index = 1 << level
+    return (((key & X_MASK) - 1) & X_MASK) | (key & YZ_MASK)
 
-    neighbours = []
-    for i in range(-1, 2):
-        for j in range(-1, 2):
-            for k in range(-1, 2):
-                neighbour_anchor = np.array([x+i, y+j, z+k, level])
 
-                if ((np.any(neighbour_anchor < 0)) or (np.any(neighbour_anchor >= max_index))):
-                    pass
-                else:
-                    neighbours.append(encode_anchor(neighbour_anchor))
+@numba.njit
+def decrement_y(key):
+    """
+    Decrement a Morton Key in the y direction.
 
-    neighbours = np.array(neighbours)
-    neighbours = neighbours[neighbours != key]
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+    return (((key & Y_MASK) - 1) & Y_MASK) | (key & XZ_MASK)
+
+
+@numba.njit
+def decrement_z(key):
+    """
+    Decrement a Morton Key in the z direction.
+
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+    return (((key & Z_MASK) - 1) & Z_MASK) | (key & XY_MASK)
+
+
+@numba.njit
+def increment_x(key):
+    """
+    Increment a Morton Key in the x direction.
+
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+
+    return (((key | YZ_MASK) + 1) & X_MASK) | (key & YZ_MASK)
+
+
+@numba.njit
+def increment_y(key):
+    """
+    Increment a Morton Key in the y direction.
+
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+    return (((key | XZ_MASK) + 1) & Y_MASK) | (key & XZ_MASK)
+
+
+@numba.njit
+def increment_z(key):
+    """
+    Increment a Morton Key in the z direction.
+
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+    return (((key | XY_MASK) + 1) & Z_MASK) | (key & XY_MASK)
+
+
+@numba.njit
+def compute_neighbours(key):
+    """
+    Compute all neighbours at the same level, even if node at a boundary.
+
+    Parameters:
+    -----------
+    key: np.int64
+
+    Returns:
+    --------
+    np.array(shape=(26,), dtype=np.int64)
+    """
+    level = key & LEVEL_MASK
+    key = key >> LEVEL_DISPLACEMENT
+
+    neighbours = np.array([
+        decrement_x(decrement_y(decrement_z(key))),
+        decrement_x(decrement_y(key)),
+        decrement_x(decrement_z(key)),
+        decrement_x(key),
+        decrement_x(increment_z(key)),
+        decrement_x(increment_y(decrement_z(key))),
+        decrement_x(increment_y(key)),
+        decrement_x(increment_y(increment_z(key))),
+        decrement_y(decrement_z(key)),
+        decrement_y(key),
+        decrement_y(increment_z(key)),
+        decrement_z(key),
+        increment_z(key),
+        increment_y(decrement_z(key)),
+        increment_y(key),
+        increment_y(increment_z(key)),
+        increment_x(decrement_y(decrement_z(key))),
+        increment_x(decrement_y(decrement_z(key))),
+        increment_x(decrement_y(key)),
+        increment_x(decrement_y(increment_z(key))),
+        increment_z(decrement_z(key)),
+        increment_x(key),
+        increment_x(increment_z(key)),
+        increment_x(increment_y(decrement_z(key))),
+        increment_x(increment_y(key)),
+        increment_x(increment_y(increment_z(key)))
+    ], np.int64)
+
+    neighbours = (neighbours << LEVEL_DISPLACEMENT) | level
+
     return neighbours
 
 
