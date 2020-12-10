@@ -112,7 +112,7 @@ def find_level(key):
     return key & LEVEL_MASK
 
 
-@numba.njit
+# @numba.njit
 def find_bounds(sources, targets):
     """
     Find the bounds of the Octree domain describing a set of sources and targets.
@@ -154,7 +154,7 @@ def find_center(max_bound, min_bound):
     return center
 
 
-@numba.njit
+# @numba.njit
 def find_radius(center, max_bound, min_bound):
     """
     Find the half side length `radius' of an Octree's root node.

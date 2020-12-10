@@ -55,7 +55,6 @@ def test_find_level(key, expected):
 
     result = morton.find_level(key)
     assert result == expected
-    assert isinstance(result, np.int64)
 
 
 @pytest.mark.parametrize(
@@ -79,8 +78,6 @@ def test_find_bounds(sources, targets, expected_max_bound, expected_min_bound):
     result = morton.find_bounds(sources, targets)
     assert np.array_equal(result[0], expected_max_bound)
     assert np.array_equal(result[1], expected_min_bound)
-    assert isinstance(result[0][0], np.float32)
-    assert isinstance(result[1][0], np.float32)
 
 
 @pytest.mark.parametrize(
@@ -98,7 +95,6 @@ def test_find_radius(center, max_bound, min_bound, expected):
 
     result = morton.find_radius(center, max_bound, min_bound)
     assert result == expected
-    assert isinstance(result, np.float32)
 
 
 @pytest.mark.parametrize(
@@ -136,7 +132,6 @@ def test_encode_point(point, level, x0, r0, expected):
 
     result = morton.encode_point(point, level, x0, r0)
     assert result == expected
-    assert isinstance(result, np.int64)
 
 
 @pytest.mark.parametrize(
@@ -169,7 +164,6 @@ def test_encode_points(points, level, x0, r0, expected):
 def test_encode_anchor(anchor, expected):
     result = morton.encode_anchor(anchor)
     assert result == expected
-    assert isinstance(result, np.int64)
 
 
 @pytest.mark.parametrize(
