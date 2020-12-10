@@ -441,43 +441,6 @@ def decode_key_lut(key):
     return np.array([x, y, z, level], np.int16)
 
 
-def not_ancestor(a, b):
-    """
-    Check if octant a is not an ancestor of octant b.
-
-    Parameters:
-    -----------
-    a : np.int64
-        Morton key
-    b : np.int64
-        Morton key
-
-    Returns:
-    --------
-    bool
-        False if a is an ancestor of b, True otherwise.
-    """
-
-    # Extract level
-    level_a = find_level(a)
-    level_b = find_level(b)
-
-    if (level_a == level_b) and (a != b):
-        return True
-
-    if (level_a > level_b):
-        return True
-
-    # Remove level offset
-    a = a >> LEVEL_DISPLACEMENT
-    b = b >> LEVEL_DISPLACEMENT
-
-    # Check remaining bits of a against b
-    b = b >> (3*(level_b - level_a))
-
-    return bool(a^b)
-
-
 @numba.njit
 def find_parent(key):
     """
@@ -778,3 +741,49 @@ def find_neighbours(key):
     neighbours = (neighbours << LEVEL_DISPLACEMENT) | level
 
     return neighbours
+
+
+@numba.njit
+def find_ancestors(key):
+    """
+    Find Morton key of all ancestors, including the key itself.
+
+    Parameters:
+    -----------
+    key : np.int64
+
+    Returns:
+    --------
+    {np.int64}
+    """
+    level = find_level(key)
+    key = key >> 15
+
+    ancestors = np.zeros(shape=(level+1), dtype=np.int64)
+    idx = 0
+
+    while level > -1:
+
+        ancestors[idx] = ((key) << 15) | level
+        key = key >> 3
+        idx += 1
+        level -= 1
+
+    return set(ancestors[:idx])
+
+
+@numba.njit
+def remove_overlaps(tree):
+    """
+    Remove the overlaps in a complete Octree.
+    """
+    linearised = np.zeros_like(tree)
+    idx = 0
+    for i in range(len(tree)-1):
+        if tree[i] not in find_ancestors(tree[i+1]):
+            linearised[idx] = tree[i]
+            idx += 1
+
+    linearised[idx] = tree[-1]
+
+    return linearised[:idx+1]
