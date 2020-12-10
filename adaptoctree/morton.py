@@ -318,7 +318,7 @@ def encode_anchors(anchors):
     --------
     np.array(shape=(N,), np.int64)
     """
-    nanchors, _ = anchors.shape
+    nanchors = len(anchors)
     keys = np.empty(shape=(nanchors), dtype=np.int64)
 
     for i, anchor in enumerate(anchors):
@@ -658,7 +658,7 @@ def increment_z(key):
 
 
 @numba.njit
-def compute_neighbours(key):
+def find_neighbours(key):
     """
     Compute all neighbours at the same level, even if node at a boundary.
 
@@ -676,6 +676,7 @@ def compute_neighbours(key):
     neighbours = np.array([
         decrement_x(decrement_y(decrement_z(key))),
         decrement_x(decrement_y(key)),
+        decrement_x(decrement_y(increment_z(key))),
         decrement_x(decrement_z(key)),
         decrement_x(key),
         decrement_x(increment_z(key)),
@@ -691,10 +692,9 @@ def compute_neighbours(key):
         increment_y(key),
         increment_y(increment_z(key)),
         increment_x(decrement_y(decrement_z(key))),
-        increment_x(decrement_y(decrement_z(key))),
         increment_x(decrement_y(key)),
         increment_x(decrement_y(increment_z(key))),
-        increment_z(decrement_z(key)),
+        increment_x(decrement_z(key)),
         increment_x(key),
         increment_x(increment_z(key)),
         increment_x(increment_y(decrement_z(key))),
@@ -702,6 +702,26 @@ def compute_neighbours(key):
         increment_x(increment_y(increment_z(key)))
     ], np.int64)
 
+    # Filter out neighbours if they outside root node domain
+    bound = (2 << (level-1)) - 1 #NOTE: Only works if level > 0
+    x_bound = np.array([bound, 0, 0, 0])
+    y_bound = np.array([0, bound, 0, 0])
+    z_bound = np.array([0, 0, bound, 0])
+    origin = np.array([0, 0, 0, 0])
+    bounds = encode_anchors([origin, x_bound, y_bound, z_bound])
+    bounds = bounds >> LEVEL_DISPLACEMENT
+
+    mask = np.zeros_like(neighbours, dtype=np.bool_)
+
+    for idx, neighbour in enumerate(neighbours):
+        if (bounds[0] <= (neighbour & X_MASK) <= bounds[1]) \
+                and  (bounds[0] <= (neighbour & Y_MASK) <= bounds[2]) \
+                and  (bounds[0] <= (neighbour & Z_MASK) <= bounds[3]):
+            mask[idx] = 1
+
+    neighbours = neighbours[mask]
+
+    # Append level bits to neighbours
     neighbours = (neighbours << LEVEL_DISPLACEMENT) | level
 
     return neighbours
