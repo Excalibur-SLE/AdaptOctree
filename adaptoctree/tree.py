@@ -99,6 +99,143 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
-def balance(unbalanced):
+def empty_int64_set():
 
-    pass
+    _set = {numba.int64(1)}
+    _set.clear()
+    return _set
+
+
+INT_ARRAY = numba.types.int64[:]
+
+
+@profile
+# @numba.njit
+def balance(unbalanced, maximum_level=16):
+
+    # Add full tree to dict for easy indexing of levels
+    tree_dict = numba.typed.Dict.empty(
+        key_type=numba.types.int64,
+        value_type=INT_ARRAY
+    )
+
+    depth = 0
+
+    for level in range(maximum_level):
+        tree_dict[level] = np.array([-1], dtype=np.int64) # sentinel
+
+    for node in unbalanced:
+        level = morton.find_level(node)
+
+        if level > depth:
+            depth = level
+
+        arr = np.array([node], dtype=np.int64)
+        if np.array_equal(tree_dict[level], np.array([-1], dtype=np.int64)):
+            tree_dict[level] = arr
+
+        else:
+            tree_dict[level] = np.hstack((tree_dict[level], arr))
+
+    # Dump the entire unbalanced tree into a set for easy lookup
+    tree_set = set()
+    tree_set.update(unbalanced)
+
+    # Iterate up through tree
+    for level in range(depth, 0, -1):
+
+        # For each node in the working set, perform neighbour search
+        for node in tree_dict[level]:
+            inv_neighbours = find_invalid_neighbours(node)
+
+            if inv_neighbours[0] != -1:
+
+                # For each invalid neighbour, check O(1) if it is in the tree
+                for inv_n in inv_neighbours:
+
+                    # If it is in the tree, remove it
+                    if inv_n in tree_set:
+                        tree_set.remove(inv_n)
+
+                    # Replace it with it's valid descendents
+                    inv_n_level = morton.find_level(inv_n)
+
+                    valid_descendents = morton.find_descendents(
+                        inv_n, inv_n_level-(level+1)
+                    )
+
+                    tree_set.update(valid_descendents)
+
+                    # Update the dict tree with the descendents
+                    desc_level = morton.find_level(valid_descendents[0])
+
+                    tmp = np.hstack((valid_descendents, tree_dict[desc_level]))
+                    updated = np.unique(tmp)
+                    tree_dict[desc_level] = updated
+
+        return tree_set
+
+
+@numba.njit
+def find_invalid_neighbours(node):
+
+    neighbours = morton.find_neighbours(node)
+    level = morton.find_level(node)
+    n_neighbours = neighbours.shape[0]
+
+    n_inv_neighbours = n_neighbours * (level - 2)
+    idx = 0
+
+    if n_inv_neighbours <= 0:
+        return np.array([-1], dtype=np.int64)
+
+    inv_neighbours = np.zeros(shape=(n_inv_neighbours), dtype=np.int64)
+    for n in neighbours:
+        for l in range(level-2, 0, -1):
+            # Remove level bits
+            inv_n = n >> 15
+
+            # Coarsen
+            inv_n = inv_n >> (3*(level-l))
+
+            # Add level bits
+            inv_n = inv_n << 15
+            inv_n = inv_n | l
+            inv_neighbours[idx] = inv_n
+            idx += 1
+
+    return np.unique(inv_neighbours)
+
+
+# Script
+
+import time
+
+import numpy as np
+
+def make_moon(npoints):
+
+    x = np.linspace(0, 2*np.pi, npoints) + np.random.rand(npoints)
+    y = 0.5*np.ones(npoints) + np.random.rand(npoints)
+    z = np.sin(x) + np.random.rand(npoints)
+
+    moon = np.array([x, y, z]).T
+    return moon
+
+N = int(1e3)
+particles = make_moon(N)
+
+unbalanced = build(particles)
+
+start = time.time()
+build(particles)
+print("Build Time ", time.time()-start)
+
+balance(unbalanced)
+
+start = time.time()
+balanced = balance(unbalanced)
+print("Balance Time: ", time.time()-start)
+
+print(balanced)
+# print(find_invalid_neighbours(229379))
