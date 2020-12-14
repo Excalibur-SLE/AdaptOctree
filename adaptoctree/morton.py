@@ -46,6 +46,9 @@ YZ_MASK = 0b110110110110110110110110110110110110110110110110
 XZ_MASK = 0b101101101101101101101101101101101101101101101101
 XY_MASK = 0b011011011011011011011011011011011011011011011011
 
+# Maximum level available within parameters of encoding
+MAXIMUM_LEVEL = 16
+
 
 def find_center_from_anchor(anchor, x0, r0):
     """
@@ -772,18 +775,242 @@ def find_ancestors(key):
     return set(ancestors[:idx])
 
 
-@numba.njit
+# @numba.njit
 def remove_overlaps(tree):
     """
     Remove the overlaps in a complete Octree.
+
+    Parameters:
+    -----------
+    tree : np.array(dtype=np.int64)
+        Sorted linear octree containing overlapping nodes.
+
+    Returns:
+    --------
+    np.array(dtype=np.int64)
     """
-    linearised = np.zeros_like(tree)
-    idx = 0
-    for i in range(len(tree)-1):
+    tree = np.array(tree)
+    n_leaves = tree.shape[0]
+    res = np.zeros_like(tree)
+    i = 0
+    j = 0
+    while i <= n_leaves-2:
         if tree[i] not in find_ancestors(tree[i+1]):
-            linearised[idx] = tree[i]
-            idx += 1
+            res[j] = tree[i]
+            j += 1
+        i += 1
 
-    linearised[idx] = tree[-1]
+    res[j] = tree[n_leaves-1]
+    return res[:j+1]
 
-    return linearised[:idx+1]
+
+def larger_than(a, b):
+    """
+    Check if Morton key 'a' is larger than 'b'.
+
+    Parameters:
+    -----------
+    a : np.int64
+    b : np.int64
+
+    Returns:
+    --------
+    np.int64
+        1 if True, 0 if False.
+    """
+
+    lz_a = nlz(a)
+    lz_b = nlz(b)
+
+    if lz_a > lz_b:
+        return 0
+    if lz_a < lz_b:
+        return 1
+    else:
+        if a >= b:
+            return 1
+        return 0
+
+
+
+@numba.njit
+def nlz(key):
+    """
+    Explicitly calculate the number of leading zeroes in a Morton key.
+
+    Parameters:
+    ----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+    level = find_level(key)
+    expected_bits = 3*(MAXIMUM_LEVEL+1-level)
+    key = key >> LEVEL_DISPLACEMENT
+    found_bits = bit_length(key)
+
+    nlz = expected_bits - found_bits
+
+    return nlz
+
+
+@numba.njit
+def bit_length(x):
+    """
+    Calculate the bit length of an integer.
+
+    Parameters:
+    -----------
+    x : np.int64
+
+    Returns:
+    --------
+    np.int64
+    """
+
+    n = 0
+    while x > 0:
+        x >>= 1
+        n += 1
+    return n
+
+
+def _partition(tree, low, high):
+    """
+    Helper method for quicksort implementation for Morton keys.
+
+    Parameters:
+    -----------
+    tree : np.array(np.int64)
+        Intended for use on linear octrees.
+    low : np.int64
+        Low index of partition.
+    high : np.int64
+        High index of partition.
+
+    Returns:
+    --------
+    np.int64
+        Partition index.
+    """
+    pivot = tree[high]
+    i = low - 1
+
+    for j in range(low, high):
+        if larger_than(pivot, tree[j]):
+            i += 1
+            tree[i], tree[j] = tree[j], tree[i]
+
+    tree[i+1], tree[high] = tree[high], tree[i+1]
+
+    return i+1
+
+
+def quicksort(tree, low, high):
+    """
+    Quicksort using Morton key special comparison.
+
+    Parameters:
+    -----------
+    tree : np.array(dtype=np.int64)
+        Linear octree, with unique elements.
+    low : np.int64
+        Starting index of sort.
+    high : np.int64
+        Ending index of sort.
+    """
+    if low < high:
+        p = _partition(tree, low, high)
+        quicksort(tree, low, p-1)
+        quicksort(tree, p+1, high)
+
+
+
+def are_neighbours(a, b, x0, r0):
+    """
+    Check if octants a and b are neighbours
+    """
+
+    if not_ancestor(a, b) and not_ancestor(b, a):
+        level_a = find_level(a)
+        level_b = find_level(b)
+
+        radius_a = r0 / (1 << level_a)
+        radius_b = r0 / (1 << level_b)
+
+        center_a = find_center_from_key(a, x0, r0)
+        center_b = find_center_from_key(b, x0, r0)
+
+        if np.linalg.norm(center_a - center_b) <= np.sqrt(3) * (radius_b + radius_a):
+            return True
+        return False
+
+    return False
+
+
+def not_ancestor(a, b):
+    """
+    Check if octant a is not an ancestor of octant b.
+    Parameters:
+    -----------
+    a : np.int64
+        Morton key
+    b : np.int64
+        Morton key
+    Returns:
+    --------
+    bool
+        False if a is an ancestor of b, True otherwise.
+    """
+
+    # Extract level
+    level_a = find_level(a)
+    level_b = find_level(b)
+
+    if (level_a == level_b) and (a != b):
+        return True
+
+    if level_a > level_b:
+        return True
+
+    # Remove level offset
+    a = a >> LEVEL_DISPLACEMENT
+    b = b >> LEVEL_DISPLACEMENT
+
+    # Check remaining bits of a against b
+    b = b >> (3 * (level_b - level_a))
+
+    return bool(a ^ b)
+
+
+
+def find_node_bounds(key, x0, r0):
+    """
+    Find the physical node (box) bounds, described by a given Morton key.
+    Parameters:
+    -----------
+    key : np.int64
+        Morton key.
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of root node of Octree.
+    r0 : np.float64
+        Half side length of root node.
+    Returns:
+    --------
+    np.array(shape=(2, 3), dtype=np.float64),
+        Bounds corresponding to (0, 0, 0) and (1, 1, 1) indices of a unit box.
+    """
+
+    center = find_center_from_key(key, x0, r0)
+
+    level = find_level(key)
+    radius = r0 / (1 << level)
+
+    displacement = np.array([radius, radius, radius])
+
+    lower_bound = center - displacement
+    upper_bound = center + displacement
+
+    return np.vstack((lower_bound, upper_bound))

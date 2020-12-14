@@ -99,143 +99,78 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
-def empty_int64_set():
 
-    _set = {numba.int64(1)}
-    _set.clear()
-    return _set
+def balance(tree, depth):
 
+    W = tree
+    P = []
+    R = []
+    #
+    for l in range(depth, 1, -1):
+        Q = [x for x in W if morton.find_level(x) == l]
+        morton.quicksort(Q, 0, len(Q)-1)
+        T = set()
+        for q in Q:
+            if not set(list(morton.find_siblings(q))).intersection(T):
+                T.add(q)
 
-INT_ARRAY = numba.types.int64[:]
+        T = list(T)
 
+        for t in T:
+            R.append(t)
+            R.extend(list(morton.find_siblings(t)))
+            parent_neighbours = list(morton.find_neighbours(morton.find_parent(t)))
+            P.extend(parent_neighbours)
 
-@profile
-# @numba.njit
-def balance(unbalanced, maximum_level=16):
+        tmp = [x for x in W if morton.find_level(x) == (l-1)]
+        P.extend(tmp)
+        W = [x for x in W if morton.find_level(x) != (l-1)]
+        P = list(set(P))
+        W.extend(P)
+        P = []
 
-    # Add full tree to dict for easy indexing of levels
-    tree_dict = numba.typed.Dict.empty(
-        key_type=numba.types.int64,
-        value_type=INT_ARRAY
-    )
+    morton.quicksort(R, 0, len(R)-1)
 
-    depth = 0
-
-    for level in range(maximum_level):
-        tree_dict[level] = np.array([-1], dtype=np.int64) # sentinel
-
-    for node in unbalanced:
-        level = morton.find_level(node)
-
-        if level > depth:
-            depth = level
-
-        arr = np.array([node], dtype=np.int64)
-        if np.array_equal(tree_dict[level], np.array([-1], dtype=np.int64)):
-            tree_dict[level] = arr
-
-        else:
-            tree_dict[level] = np.hstack((tree_dict[level], arr))
-
-    # Dump the entire unbalanced tree into a set for easy lookup
-    tree_set = set()
-    tree_set.update(unbalanced)
-
-    # Iterate up through tree
-    for level in range(depth, 0, -1):
-
-        # For each node in the working set, perform neighbour search
-        for node in tree_dict[level]:
-            inv_neighbours = find_invalid_neighbours(node)
-
-            if inv_neighbours[0] != -1:
-
-                # For each invalid neighbour, check O(1) if it is in the tree
-                for inv_n in inv_neighbours:
-
-                    # If it is in the tree, remove it
-                    if inv_n in tree_set:
-                        tree_set.remove(inv_n)
-
-                    # Replace it with it's valid descendents
-                    inv_n_level = morton.find_level(inv_n)
-
-                    valid_descendents = morton.find_descendents(
-                        inv_n, inv_n_level-(level+1)
-                    )
-
-                    tree_set.update(valid_descendents)
-
-                    # Update the dict tree with the descendents
-                    desc_level = morton.find_level(valid_descendents[0])
-
-                    tmp = np.hstack((valid_descendents, tree_dict[desc_level]))
-                    updated = np.unique(tmp)
-                    tree_dict[desc_level] = updated
-
-        return tree_set
+    return list(morton.remove_overlaps(R))
 
 
-@numba.njit
-def find_invalid_neighbours(node):
+def assign_points_to_keys(points, tree, x0, r0):
+    """
+    Assign particle positions to Morton keys in a given tree.
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3), dtype=np.float32)
+    tree : Octree
+    Returns:
+    --------
+    np.array(shape=(N,), dtype=np.int64)
+        Column vector specifying the Morton key of the node that each point is
+        associated with.
+    """
+    # Map Morton key to bounds that they represent.
+    n_points = points.shape[0]
+    n_keys = tree.shape[0]
+    lower_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
+    upper_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
 
-    neighbours = morton.find_neighbours(node)
-    level = morton.find_level(node)
-    n_neighbours = neighbours.shape[0]
+    leaves = np.zeros(n_points, dtype=np.int64)
 
-    n_inv_neighbours = n_neighbours * (level - 2)
-    idx = 0
+    # Loop over all nodes to find bounds
+    for i in range(n_keys):
+        key = tree[i]
+        bounds = morton.find_node_bounds(key, x0, r0)
+        lower_bounds[i : i + 2, :] = bounds[0, :]
+        upper_bounds[i : i + 2, :] = bounds[1, :]
 
-    if n_inv_neighbours <= 0:
-        return np.array([-1], dtype=np.int64)
+    # Loop over points, and assign to a node from the tree by examining the bounds
+    for i, point in enumerate(points):
+        upper_bound_index = np.all(point < upper_bounds, axis=1)
+        lower_bound_index = np.all(point >= lower_bounds, axis=1)
+        leaf_index = upper_bound_index & lower_bound_index
 
-    inv_neighbours = np.zeros(shape=(n_inv_neighbours), dtype=np.int64)
-    for n in neighbours:
-        for l in range(level-2, 0, -1):
-            # Remove level bits
-            inv_n = n >> 15
+        if np.count_nonzero(leaf_index) != 1:
+            a = tree[leaf_index]
 
-            # Coarsen
-            inv_n = inv_n >> (3*(level-l))
+        leaves[i] = tree[leaf_index]
 
-            # Add level bits
-            inv_n = inv_n << 15
-            inv_n = inv_n | l
-            inv_neighbours[idx] = inv_n
-            idx += 1
-
-    return np.unique(inv_neighbours)
-
-
-# Script
-
-import time
-
-import numpy as np
-
-def make_moon(npoints):
-
-    x = np.linspace(0, 2*np.pi, npoints) + np.random.rand(npoints)
-    y = 0.5*np.ones(npoints) + np.random.rand(npoints)
-    z = np.sin(x) + np.random.rand(npoints)
-
-    moon = np.array([x, y, z]).T
-    return moon
-
-N = int(1e3)
-particles = make_moon(N)
-
-unbalanced = build(particles)
-
-start = time.time()
-build(particles)
-print("Build Time ", time.time()-start)
-
-balance(unbalanced)
-
-start = time.time()
-balanced = balance(unbalanced)
-print("Balance Time: ", time.time()-start)
-
-print(balanced)
-# print(find_invalid_neighbours(229379))
+    return leaves
