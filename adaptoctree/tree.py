@@ -99,39 +99,59 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
+def bfs(root, tree, depth):
+
+    queue = [root]
+
+    overlaps = set()
+
+    while queue:
+        for node in queue:
+            level = morton.find_level(root)
+            new_queue = []
+            for l in range(1, depth-level + 1):
+
+                descs = set(morton.find_descendents(node, l))
+
+                ints = descs.intersection(tree)
+                overlaps.update(ints)
+                new_queue.extend(list(ints))
+
+        queue = new_queue
+
+    return overlaps
+
+
+def remove_overlaps(balanced, depth):
+    depth = max(morton.find_level(np.array(balanced)))
+
+    unique = set(balanced)
+
+    for node in balanced:
+        if bfs(node, unique, depth):
+            unique.remove(node)
+
+    return unique
+
 
 def balance(tree, depth):
 
-    W = tree
-    P = []
-    R = []
-    #
-    for l in range(depth, 1, -1):
-        Q = [x for x in W if morton.find_level(x) == l]
-        morton.quicksort(Q, 0, len(Q)-1)
-        T = set()
+    balanced = set(tree)
+
+    for l in range(depth, 0, -1):
+        # nodes at current level
+        Q = {x for x in balanced if morton.find_level(x) == l}
+
         for q in Q:
-            if not set(list(morton.find_siblings(q))).intersection(T):
-                T.add(q)
+            parent = morton.find_parent(q)
+            neighbours = set(morton.find_neighbours(q))
+            parent_neighbours = set(morton.find_neighbours(parent))
+            balanced.update(parent_neighbours)
+            balanced.update(neighbours)
 
-        T = list(T)
+    return remove_overlaps(list(balanced), depth)
 
-        for t in T:
-            R.append(t)
-            R.extend(list(morton.find_siblings(t)))
-            parent_neighbours = list(morton.find_neighbours(morton.find_parent(t)))
-            P.extend(parent_neighbours)
 
-        tmp = [x for x in W if morton.find_level(x) == (l-1)]
-        P.extend(tmp)
-        W = [x for x in W if morton.find_level(x) != (l-1)]
-        P = list(set(P))
-        W.extend(P)
-        P = []
-
-    morton.quicksort(R, 0, len(R)-1)
-
-    return list(morton.remove_overlaps(R))
 
 
 def assign_points_to_keys(points, tree, x0, r0):
@@ -149,7 +169,7 @@ def assign_points_to_keys(points, tree, x0, r0):
     """
     # Map Morton key to bounds that they represent.
     n_points = points.shape[0]
-    n_keys = tree.shape[0]
+    n_keys = len(tree)
     lower_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
     upper_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
 
@@ -174,3 +194,5 @@ def assign_points_to_keys(points, tree, x0, r0):
         leaves[i] = tree[leaf_index]
 
     return leaves
+
+

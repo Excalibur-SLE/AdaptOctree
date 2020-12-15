@@ -1,7 +1,5 @@
 import itertools
 import time
-import matplotlib
-matplotlib.use('TKAgg')
 import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
@@ -9,6 +7,8 @@ import numpy as np
 from adaptoctree.tree import balance, build
 import adaptoctree.morton as morton
 
+# import matplotlib
+# matplotlib.use('Qt5Cairo')
 
 def plot_tree(octree, balanced, sources, octree_center, octree_radius):
     """
@@ -86,23 +86,27 @@ def main():
     sources = targets = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
     # sources = targets = make_spiral(N)
-    maximum_level = 5
-    maximum_particles = 150
+    maximum_level = 16
+    maximum_particles = 50
     max_bound, min_bound = morton.find_bounds(sources)
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     start = time.time()
-    octree = build(sources)
+    octree = build(particles=sources, maximum_level=maximum_level, max_num_particles=maximum_particles)
     print(f"Build runtime: {time.time()-start}")
 
     depth = max(morton.find_level(np.unique(octree)))
 
     original = np.unique(octree)
 
+    print(original.shape)
+
     start = time.time()
     balanced = balance(original, depth)
+
     print(f"Balancing runtime: {time.time() - start}")
+    print(len(balanced))
 
     plot_tree(original, balanced, sources, octree_center, octree_radius)
 
