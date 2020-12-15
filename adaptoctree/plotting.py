@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-from adaptoctree.tree import balance, build
+from adaptoctree.tree import balance, build, numba_balance
 import adaptoctree.morton as morton
 
 # import matplotlib
@@ -83,17 +83,17 @@ def main():
     np.random.seed(0)
 
     N = int(1000)
-    sources = targets = make_moon(N)
+    particles = make_moon(N)
     # sources = targets = np.random.rand(N, 3)
     # sources = targets = make_spiral(N)
     maximum_level = 16
     maximum_particles = 50
-    max_bound, min_bound = morton.find_bounds(sources)
+    max_bound, min_bound = morton.find_bounds(particles)
     octree_center = morton.find_center(max_bound, min_bound)
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     start = time.time()
-    octree = build(particles=sources, maximum_level=maximum_level, max_num_particles=maximum_particles)
+    octree = build(particles=particles, maximum_level=maximum_level, max_num_particles=maximum_particles)
     print(f"Build runtime: {time.time()-start}")
 
     depth = max(morton.find_level(np.unique(octree)))
@@ -103,12 +103,14 @@ def main():
     print(original.shape)
 
     start = time.time()
-    balanced = balance(original, depth)
+    balanced = numba_balance(original, depth)
 
     print(f"Balancing runtime: {time.time() - start}")
-    print(len(balanced))
+    # print(len(balanced))
 
-    plot_tree(original, balanced, sources, octree_center, octree_radius)
+    # numba_balance(original, depth)
+
+    plot_tree(original, balanced, particles, octree_center, octree_radius)
 
 
 if __name__ == "__main__":

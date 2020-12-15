@@ -929,24 +929,23 @@ def quicksort(tree, low, high):
 
 
 def are_neighbours(a, b, x0, r0):
-    """
-    Check if octants a and b are neighbours
-    """
 
-    if not_ancestor(a, b) and not_ancestor(b, a):
-        level_a = find_level(a)
-        level_b = find_level(b)
-
-        radius_a = r0 / (1 << level_a)
-        radius_b = r0 / (1 << level_b)
-
-        center_a = find_center_from_key(a, x0, r0)
-        center_b = find_center_from_key(b, x0, r0)
-
-        if np.linalg.norm(center_a - center_b) <= np.sqrt(3) * (radius_b + radius_a):
-            return True
+    if a in find_ancestors(b):
+        return False
+    if b in find_ancestors(a):
         return False
 
+    level_a = find_level(a)
+    radius_a = r0 / (1 << level_a)
+
+    level_b = find_level(b)
+    radius_b = r0 / (1 << level_b)
+
+    centre_a = find_center_from_key(a, x0, r0)
+    centre_b = find_center_from_key(b, x0, r0)
+
+    if np.linalg.norm(centre_a - centre_b) <= np.sqrt(3) * (radius_b + radius_a):
+        return True
     return False
 
 

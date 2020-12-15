@@ -8,8 +8,6 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
-
-
 @numba.njit(parallel=True)
 def build(particles, maximum_level=16, max_num_particles=100, first_level=1):
 
@@ -107,7 +105,7 @@ def bfs(root, tree, depth):
 
     while queue:
         for node in queue:
-            level = morton.find_level(root)
+            level = morton.find_level(node)
             new_queue = []
             for l in range(1, depth-level + 1):
 
@@ -123,7 +121,6 @@ def bfs(root, tree, depth):
 
 
 def remove_overlaps(balanced, depth):
-    depth = max(morton.find_level(np.array(balanced)))
 
     unique = set(balanced)
 
@@ -148,10 +145,93 @@ def balance(tree, depth):
             parent_neighbours = set(morton.find_neighbours(parent))
             balanced.update(parent_neighbours)
             balanced.update(neighbours)
-
     return remove_overlaps(list(balanced), depth)
 
 
+@numba.njit
+def numba_bfs(root, tree, depth):
+
+    tree = set(tree)
+    queue = np.array([root], dtype=np.int64)
+
+    overlaps = set()
+
+    sentinel = -1
+
+    while queue[0] != sentinel:
+        for node in queue:
+
+            level = morton.find_level(node)
+            new_queue = np.array([sentinel], dtype=np.int64)
+            relative_depth = depth-level+1
+
+            for l in range(1, relative_depth):
+                descs = morton.find_descendents(node, l)
+                ints = np.zeros_like(descs, dtype=np.int64)
+
+                i = 0
+                for d in descs:
+                    if d in tree:
+                        ints[i] = d
+                        i += 1
+
+                ints = ints[:i]
+
+                overlaps.update(ints)
+
+                if new_queue[0] == sentinel:
+                    new_queue = ints
+                else:
+                    new_queue = np.hstack((new_queue, ints))
+
+        queue = new_queue
+
+    return overlaps
+
+
+# @numba.njit
+def numba_remove_overlaps(balanced, depth):
+
+    unique = set(balanced)
+
+    for node in balanced:
+        if numba_bfs(node, balanced, depth):
+            unique.remove(node)
+
+    return unique
+
+
+# @numba.njit
+def numba_balance_helper(tree, depth):
+
+    balanced = set(tree)
+
+    for l in range(depth, 0, -1):
+
+        n_nodes = len(balanced)
+        Q = np.zeros(shape=(n_nodes), dtype=np.int64)
+
+        i = 0
+        for node in balanced:
+            if morton.find_level(node) == l:
+                Q[i] = node
+                i += 1
+
+        for q in Q[:i]:
+            parent = morton.find_parent(q)
+            neighbours = set(morton.find_neighbours(q))
+            parent_neighbours = set(morton.find_neighbours(parent))
+
+            balanced.update(parent_neighbours)
+            balanced.update(neighbours)
+
+    return balanced
+
+
+def numba_balance(tree, depth):
+    tmp = numba_balance_helper(tree, depth)
+    tmp = np.fromiter(tmp, np.int64, len(tmp))
+    return numba_remove_overlaps(tmp, depth)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
@@ -170,29 +250,13 @@ def assign_points_to_keys(points, tree, x0, r0):
     # Map Morton key to bounds that they represent.
     n_points = points.shape[0]
     n_keys = len(tree)
-    lower_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
-    upper_bounds = np.zeros(shape=(n_keys, 3), dtype=np.float32)
-
     leaves = np.zeros(n_points, dtype=np.int64)
-
-    # Loop over all nodes to find bounds
-    for i in range(n_keys):
-        key = tree[i]
-        bounds = morton.find_node_bounds(key, x0, r0)
-        lower_bounds[i : i + 2, :] = bounds[0, :]
-        upper_bounds[i : i + 2, :] = bounds[1, :]
 
     # Loop over points, and assign to a node from the tree by examining the bounds
     for i, point in enumerate(points):
-        upper_bound_index = np.all(point < upper_bounds, axis=1)
-        lower_bound_index = np.all(point >= lower_bounds, axis=1)
-        leaf_index = upper_bound_index & lower_bound_index
-
-        if np.count_nonzero(leaf_index) != 1:
-            a = tree[leaf_index]
-
-        leaves[i] = tree[leaf_index]
+        for key in tree:
+            lower_bound, upper_bound = morton.find_node_bounds(key, x0, r0)
+            if (np.all(lower_bound <= point)) and (np.all(point < upper_bound )):
+                leaves[i] = key
 
     return leaves
-
-
