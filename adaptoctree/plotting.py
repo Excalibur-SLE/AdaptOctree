@@ -4,11 +4,9 @@ import matplotlib.pyplot as plt
 from mpl_toolkits.mplot3d import Axes3D
 import numpy as np
 
-from adaptoctree.tree import balance, build, numba_balance
+from adaptoctree.tree import balance, build
 import adaptoctree.morton as morton
 
-# import matplotlib
-# matplotlib.use('Qt5Cairo')
 
 def plot_tree(octree, balanced, sources, octree_center, octree_radius):
     """
@@ -84,9 +82,9 @@ def main():
 
     N = int(1000)
     particles = make_moon(N)
-    # sources = targets = np.random.rand(N, 3)
+    # particles = np.random.rand(N, 3)
     # sources = targets = make_spiral(N)
-    maximum_level = 16
+    maximum_level = 3
     maximum_particles = 50
     max_bound, min_bound = morton.find_bounds(particles)
     octree_center = morton.find_center(max_bound, min_bound)
@@ -103,7 +101,7 @@ def main():
     print(original.shape)
 
     start = time.time()
-    balanced = numba_balance(original, depth)
+    balanced = balance(original, depth)
 
     print(f"Balancing runtime: {time.time() - start}")
     # print(len(balanced))
