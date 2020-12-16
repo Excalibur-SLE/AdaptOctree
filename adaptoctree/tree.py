@@ -97,47 +97,7 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
-def bfs(root, tree, depth):
-    """
-    Perform breadth-first search starting from a given root, to find
-        children in the tree that it overlaps with.
-
-    Parameters:
-    -----------
-    root : np.int64
-        Root of BFS.
-    tree : np.array(dtype=np.int64)
-        Linear octree.
-    depth : np.int64
-        Maximum depth of octree.
-
-    Returns:
-    --------
-    {np.int64}
-        Set of overlapping children, if they exist.
-    """
-    tree = set(tree)
-    queue = [root]
-
-    overlaps = set()
-
-    while queue:
-        for node in queue:
-            level = morton.find_level(node)
-            new_queue = []
-            for l in range(1, depth-level + 1):
-
-                descs = set(morton.find_descendents(node, l))
-
-                ints = descs.intersection(tree)
-                overlaps.update(ints)
-                new_queue.extend(list(ints))
-
-        queue = new_queue
-
-    return overlaps
-
-
+@numba.njit
 def remove_overlaps(tree, depth):
     """
     Perform BFS, for each node in the linear octree, and remove if
@@ -153,6 +113,47 @@ def remove_overlaps(tree, depth):
     {np.int64}
     """
 
+    def bfs(root, tree, depth):
+        """
+        Perform breadth-first search starting from a given root, to find
+            children in the tree that it overlaps with.
+
+        Parameters:
+        -----------
+        root : np.int64
+            Root of BFS.
+        tree : np.array(dtype=np.int64)
+            Linear octree.
+        depth : np.int64
+            Maximum depth of octree.
+
+        Returns:
+        --------
+        {np.int64}
+            Set of overlapping children, if they exist.
+        """
+        # tree = set(tree)
+        queue = [root]
+
+        overlaps = set()
+
+        while queue:
+            for node in queue:
+                level = morton.find_level(node)
+                new_queue = []
+                for l in range(1, depth-level + 1):
+
+                    descs = morton.find_descendents(node, l)
+                    ints = set(descs).intersection(tree)
+
+                    overlaps.update(ints)
+
+                    new_queue.extend(list(ints))
+
+            queue = new_queue
+
+        return overlaps
+
     unique = set(tree)
 
     for node in tree:
@@ -162,7 +163,8 @@ def remove_overlaps(tree, depth):
     return unique
 
 
-def balance(tree, depth):
+@numba.njit
+def balance_helper(tree, depth):
     """
     Perform balancing to enforece the 2:1 constraint between neighbouring
         nodes in linear octree.
@@ -175,21 +177,40 @@ def balance(tree, depth):
     Returns:
     --------
     {np.int64}
-        Balanced octree
+        Balanced linear octree, containing overlaps.
     """
     balanced = set(tree)
 
     for l in range(depth, 0, -1):
         # nodes at current level
-        Q = {x for x in balanced if morton.find_level(x) == l}
+        Q = [x for x in balanced if morton.find_level(x) == l]
 
         for q in Q:
             parent = morton.find_parent(q)
             neighbours = set(morton.find_neighbours(q))
             parent_neighbours = set(morton.find_neighbours(parent))
+
             balanced.update(parent_neighbours)
             balanced.update(neighbours)
-    return remove_overlaps(list(balanced), depth)
+
+    return numba.typed.List(balanced)
+
+
+def balance(tree, depth):
+    """
+    Wrapper for JIT'd balance functions.
+
+    Parameters:
+    -----------
+    tree : np.array(dtype=np.int64)
+    depth : np.int64
+
+    Returns:
+    --------
+    np.array(np.int64)
+        Balanced octree
+    """
+    return  remove_overlaps(balance_helper(tree, depth), depth)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
