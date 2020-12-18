@@ -10,6 +10,26 @@ import adaptoctree.morton as morton
 
 @numba.njit(parallel=True, cache=True)
 def build(points, max_level=16, max_points=100, start_level=1):
+    """
+    Build an unbalanced linear Morton encoded octree, that satisfied a the
+        constraint of at most 'max_points' points per node.
+
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3), dtype=np.float32)
+        Points in R3.
+    max_level : np.int64
+        Maximum level of the octree.
+    max_points : np.int64
+        Maximum number of points per node.
+    start_level : np.int64
+        Level at which to start tree construction from.
+
+    Returns:
+    --------
+    np.array(shape=(N,), dtype=np.int64)
+        Morton key corresponding to each point.
+    """
 
     max_bound, min_bound = morton.find_bounds(points)
     x0 = morton.find_center(max_bound, min_bound)
@@ -38,22 +58,47 @@ def build(points, max_level=16, max_points=100, start_level=1):
 
 
 @numba.njit(cache=True)
-def build_helper(points, max_level, max_points, x0, r0, keys, work_indices, start_level):
+def build_helper(
+    points, max_level, max_points, x0, r0, keys, work_indices, start_level
+):
     """
-    Build helper function
+    Build helper function. Works in-place on batches of points with same Morton
+        key at the coarsest level 'start_level', and maintaining the max
+        particles per node constraint.
+
+        Strategy: For all particles in a given octant of the root node at the
+        'start_level', calculate if any child octants violate the max_particles
+        constraint - if they do, then repartition the particles into the
+        grand child octants, and so on, until the constraint is satisfied.
+
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3), dtype=np.float32)
+        Points in R3.
+    max_level : np.int64
+        Maximum level of the octree.
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of root node of Octree.
+    r0 : np.float64
+        Half side length of root node.
+    keys : np.array(shape=(N,), dtype=np.int64)
+        Morton encodings at coarsest level 'start_level'.
+    work_indices : np.array(dtype=np.int64)
+        Global, in a sense, indices of the whole points dataset, corresponding
+        to particles with the current key under consideration.
+    start_level : np.int64
+        Level at which to start tree construction from.
     """
 
     level = start_level
-
-    todo_indices_sorted = work_indices[np.argsort(keys[work_indices])]
 
     while True:
         if level == max_level:
             break
 
-        todo_list = process_level(todo_indices_sorted, keys, max_points)
+        work_list = find_work_items(work_indices, keys, max_points)
 
-        ntodo = len(todo_list)
+        ntodo = len(work_list)
 
         if ntodo == 0:
             break
@@ -61,44 +106,62 @@ def build_helper(points, max_level, max_points, x0, r0, keys, work_indices, star
         work_indices = np.empty(ntodo, dtype=np.int64)
 
         for index in range(ntodo):
-            work_indices[index] = todo_list[index]
+            work_indices[index] = work_list[index]
 
-        if len(work_indices) == 0:
-            # We are done
-            break
-        else:
-            keys[work_indices] = morton.encode_points(
-                points[work_indices], level + 1, x0, r0
-            )
+        keys[work_indices] = morton.encode_points(
+            points[work_indices], level + 1, x0, r0
+        )
 
-            todo_indices_sorted = work_indices[np.argsort(keys[work_indices])]
+        work_indices = work_indices[np.argsort(keys[work_indices])]
 
-            level += 1
-
-    return keys
+        level += 1
 
 
 @numba.njit(cache=True)
-def process_level(sorted_indices, morton_keys, max_num_particles):
-    """Process a level."""
+def find_work_items(sorted_work_indices, keys, max_points):
+    """
+    Process a level, to find the work items corresponding to particles that
+        occupy a certain node that exceed the maximum points per node threshold.
+        This method returns the global indices of these particles.
+
+    Parameters:
+    -----------
+    sorted_work_indices : np.array(dtype=np.int64)
+        Sorted array of indices, that are being worked on. Correspond to a shared
+        ancestor in the coarsest level (start_level).
+    keys : np.array(dtype=np.int64)
+        All morton keys thus far encoded, mutable.
+    max_points : np.int64
+        The maximum points per node constraint.
+
+    Returns:
+    --------
+    List([numba.types.int64])
+        List corresponding to the indices of keys which do not satisfy the
+        max particles per node constraint.
+    """
     count = 0
-    pivot = morton_keys[sorted_indices[0]]
-    nindices = len(sorted_indices)
+    pivot = keys[sorted_work_indices[0]]
+    nindices = len(sorted_work_indices)
+
     todo = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
     trial_set = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
+
     for index in range(nindices):
-        if morton_keys[sorted_indices[index]] != pivot:
-            if count > max_num_particles:
+        if keys[sorted_work_indices[index]] != pivot:
+            if count > max_points:
                 todo.extend(trial_set)
             trial_set.clear()
-            pivot = morton_keys[sorted_indices[index]]
+            pivot = keys[sorted_work_indices[index]]
             count = 0
         count += 1
-        trial_set.append(sorted_indices[index])
+        trial_set.append(sorted_work_indices[index])
+
     # The last element in the for-loop might have
     # a too large count. Need to process this as well
-    if count > max_num_particles:
+    if count > max_points:
         todo.extend(trial_set)
+
     return todo
 
 
