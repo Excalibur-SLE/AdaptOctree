@@ -15,66 +15,67 @@ def build(points, max_level=16, max_points=100, start_level=1):
     x0 = morton.find_center(max_bound, min_bound)
     r0 = morton.find_radius(x0, max_bound, min_bound)
 
-    keys = morton.encode_points_smt(
-        points, start_level, x0, r0
-    )
+    keys = morton.encode_points_smt(points, start_level, x0, r0)
     unique_keys = np.unique(keys)
     n_unique_keys = len(unique_keys)
 
     for key_idx in numba.prange(n_unique_keys):
 
-        todo_indices = np.where(keys == unique_keys[key_idx])[0]
+        work_indices = np.where(keys == unique_keys[key_idx])[0]
 
-        _build(
-            points,
-            max_level,
-            max_points,
-            x0,
-            r0,
-            keys,
-            todo_indices,
-            start_level,
+        build_helper(
+            points=points,
+            max_level=max_level,
+            max_points=max_points,
+            x0=x0,
+            r0=r0,
+            keys=keys,
+            work_indices=work_indices,
+            start_level=start_level,
         )
 
     return keys
 
 
 @numba.njit(cache=True)
-def _build(
-    particles,
-    maximum_level,
-    max_num_particles,
-    octree_center,
-    octree_radius,
-    morton_keys,
-    todo_indices,
-    first_level,
-):
+def build_helper(points, max_level, max_points, x0, r0, keys, work_indices, start_level):
+    """
+    Build helper function
+    """
 
-    level = first_level
+    level = start_level
 
-    todo_indices_sorted = todo_indices[np.argsort(morton_keys[todo_indices])]
+    todo_indices_sorted = work_indices[np.argsort(keys[work_indices])]
 
     while True:
-        if level == (maximum_level):
+        if level == max_level:
             break
-        todo_list = process_level(todo_indices_sorted, morton_keys, max_num_particles)
+
+        todo_list = process_level(todo_indices_sorted, keys, max_points)
+
         ntodo = len(todo_list)
+
         if ntodo == 0:
             break
-        todo_indices = np.empty(ntodo, dtype=np.int64)
+
+        work_indices = np.empty(ntodo, dtype=np.int64)
+
         for index in range(ntodo):
-            todo_indices[index] = todo_list[index]
-        if len(todo_indices) == 0:
+            work_indices[index] = todo_list[index]
+
+        if len(work_indices) == 0:
             # We are done
             break
         else:
-            morton_keys[todo_indices] = morton.encode_points(
-                particles[todo_indices], level + 1, octree_center, octree_radius
+            keys[work_indices] = morton.encode_points(
+                points[work_indices], level + 1, x0, r0
             )
-            todo_indices_sorted = todo_indices[np.argsort(morton_keys[todo_indices])]
+
+            todo_indices_sorted = work_indices[np.argsort(keys[work_indices])]
+
             level += 1
-    return morton_keys
+
+    return keys
 
 
 @numba.njit(cache=True)
@@ -189,11 +190,9 @@ def balance_helper(tree, depth):
         Q = [x for x in balanced if morton.find_level(x) == l]
 
         for q in Q:
-            parent = morton.find_parent(q)
             neighbours = morton.find_neighbours(q)
 
             # Add neighbours, and neighbour siblings - may overlap
-            siblings = set(morton.find_siblings(q))
             for n in neighbours:
                 balanced.update(set(morton.find_siblings(n)))
                 balanced.update(set([morton.find_parent(n)]))
