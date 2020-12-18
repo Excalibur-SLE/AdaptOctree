@@ -236,10 +236,12 @@ def assign_points_to_keys(points, tree, x0, r0):
     leaves = -1*np.ones(n_points, dtype=np.int64)
 
     # Loop over points, and assign to a node from the tree by examining the bounds
+    depth = find_depth(tree)
+
     for i, point in enumerate(points):
-        for key in tree:
-            lower_bound, upper_bound = morton.find_node_bounds(key, x0, r0)
-            if (np.all(lower_bound <= point)) and (np.all(point < upper_bound)):
+        for level in range(1, depth+1):
+            key = morton.encode_point(point, level, x0, r0)
+            if key in tree:
                 leaves[i] = key
 
     return leaves
