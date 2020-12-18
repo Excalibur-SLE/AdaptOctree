@@ -194,18 +194,6 @@ def test_decode_key(key, expected):
 
 
 @pytest.mark.parametrize(
-    "a, b, expected",
-    [
-        (0, 1, False),
-        (1, 65537, True)
-    ]
-)
-def test_not_ancestor(a, b, expected):
-    result = morton.not_ancestor(a, b)
-    assert result == expected
-
-
-@pytest.mark.parametrize(
     "key, expected",
     [
         (np.int64(1), np.array([1, 32769, 65537, 98305, 131073, 163841, 196609, 229377]))

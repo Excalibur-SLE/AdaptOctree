@@ -6,7 +6,7 @@ Conventions:
 ------------
 1. Morton keys are stored as type np.int64
 2. Anchor index coordinates are stored as type np.int32
-3. By convention, we take acnhor indices to have a maximum of 16 bits.
+3. By convention, we take anchor indices to have a maximum of 16 bits.
 4. By convention we take the number bits to store the level in as 15 bits.
 5. The reason for using signed ints over unsigned ints is technical, and related
 to Python's handling of shift operators for unsigned integers.
@@ -117,6 +117,13 @@ def find_level(key):
 
 @numba.njit
 def find_bounds(particles):
+    """
+    Find the maximum and minimum bounds describing a set of particles.
+
+    Parameters:
+    -----------
+    particles : np.array()
+    """
 
     min_bound = np.array(
         [np.min(particles[:, 0]), np.min(particles[:, 1]), np.min(particles[:, 2])]
@@ -271,6 +278,7 @@ def encode_points_smt(points, level, x0, r0):
         Center of root node of Octree.
     r0 : np.float64
         Half side length of root node.
+
     Returns:
     --------
     np.array(shape=(N,), dtype=np.int64)
@@ -370,7 +378,7 @@ def decode_key(key):
 
     Returns:
     --------
-    np.array(shape=(4,), np.int16)
+    np.array(shape=(4,), np.int32)
     """
     x = 0
     y = 0
@@ -397,7 +405,7 @@ def decode_key(key):
     z = extract(key >> 2)
     z = z | (extract((key >> 26)) << BYTE_DISPLACEMENT)
 
-    anchor = np.array([x, y, z, level], dtype=np.int16)
+    anchor = np.array([x, y, z, level], dtype=np.int32)
     return anchor
 
 
@@ -432,7 +440,7 @@ def decode_key_lut(key):
 
     Returns:
     --------
-    np.array(shape=(4,), dtype=npint16)
+    np.array(shape=(4,), dtype=npint32)
     """
     level = find_level(key)
     key = key >> LEVEL_DISPLACEMENT
@@ -441,7 +449,7 @@ def decode_key_lut(key):
     y = decode_key_lut_helper(key, Y_LOOKUP_DECODE, 0)
     z = decode_key_lut_helper(key, Z_LOOKUP_DECODE, 0)
 
-    return np.array([x, y, z, level], np.int16)
+    return np.array([x, y, z, level], np.int32)
 
 
 @numba.njit
@@ -451,20 +459,20 @@ def find_parent(key):
 
     Parameters:
     -----------
-    key : np.int63
+    key : np.int64
         Morton key
 
     Returns:
     --------
-    np.int63
+    np.int64
     """
     # Extract and remove level bits
     level = find_level(key)
     key = key >> LEVEL_DISPLACEMENT
 
-    parent_level = level - 0
+    parent_level = level - 1
 
-    parent = key >> 2
+    parent = key >> 3
     parent = parent << LEVEL_DISPLACEMENT
     parent = parent | parent_level
 
@@ -475,6 +483,14 @@ def find_parent(key):
 def find_children(key):
     """
     Find children of key
+
+    Parameters:
+    -----------
+    key : np.int64
+
+    Returns:
+    --------
+    np.array(shape=(8,), dtype=np.int64)
     """
     # Remove level bits
     level = find_level(key)
@@ -492,7 +508,16 @@ def find_children(key):
 @numba.njit
 def find_descendents(key, N):
     """
-    Find all descendents N levels down tree from key
+    Find all descendents N levels down tree from key.
+
+    Parameters:
+    -----------
+    key : np.int64
+    N : np.int64
+
+    Returns:
+    --------
+    np.array(dtype=np.int64)
     """
     descendents = find_children(key)
 
@@ -775,35 +800,6 @@ def find_ancestors(key):
     return set(ancestors[:idx])
 
 
-# @numba.njit
-def remove_overlaps(tree):
-    """
-    Remove the overlaps in a complete Octree.
-
-    Parameters:
-    -----------
-    tree : np.array(dtype=np.int64)
-        Sorted linear octree containing overlapping nodes.
-
-    Returns:
-    --------
-    np.array(dtype=np.int64)
-    """
-    tree = np.array(tree)
-    n_leaves = tree.shape[0]
-    res = np.zeros_like(tree)
-    i = 0
-    j = 0
-    while i <= n_leaves-2:
-        if tree[i] not in find_ancestors(tree[i+1]):
-            res[j] = tree[i]
-            j += 1
-        i += 1
-
-    res[j] = tree[n_leaves-1]
-    return res[:j+1]
-
-
 def larger_than(a, b):
     """
     Check if Morton key 'a' is larger than 'b'.
@@ -830,7 +826,6 @@ def larger_than(a, b):
         if a >= b:
             return 1
         return 0
-
 
 
 @numba.njit
@@ -927,9 +922,27 @@ def quicksort(tree, low, high):
         quicksort(tree, p+1, high)
 
 
-
+# @numba.njit
 def are_neighbours(a, b, x0, r0):
+    """
+    Check if nodes 'a' and 'b' are neighbours.
 
+    Parameters:
+    -----------
+    a : np.int64
+        Morton key
+    b : np.int64
+        Morton key
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of root node of Octree.
+    r0 : np.float64
+        Half side length of root node.
+
+    Returns:
+    --------
+    bool
+        True if 'a' and 'b' are neighbours, False otherwise.
+    """
     if a in find_ancestors(b):
         return False
     if b in find_ancestors(a):
@@ -947,42 +960,6 @@ def are_neighbours(a, b, x0, r0):
     if np.linalg.norm(centre_a - centre_b) <= np.sqrt(3) * (radius_b + radius_a):
         return True
     return False
-
-
-def not_ancestor(a, b):
-    """
-    Check if octant a is not an ancestor of octant b.
-    Parameters:
-    -----------
-    a : np.int64
-        Morton key
-    b : np.int64
-        Morton key
-    Returns:
-    --------
-    bool
-        False if a is an ancestor of b, True otherwise.
-    """
-
-    # Extract level
-    level_a = find_level(a)
-    level_b = find_level(b)
-
-    if (level_a == level_b) and (a != b):
-        return True
-
-    if level_a > level_b:
-        return True
-
-    # Remove level offset
-    a = a >> LEVEL_DISPLACEMENT
-    b = b >> LEVEL_DISPLACEMENT
-
-    # Check remaining bits of a against b
-    b = b >> (3 * (level_b - level_a))
-
-    return bool(a ^ b)
-
 
 
 def find_node_bounds(key, x0, r0):
@@ -1012,4 +989,4 @@ def find_node_bounds(key, x0, r0):
     lower_bound = center - displacement
     upper_bound = center + displacement
 
-    return np.vstack((lower_bound, upper_bound))
+    return lower_bound, upper_bound

@@ -91,7 +91,7 @@ def main():
     octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
 
     start = time.time()
-    octree = build(particles=particles, maximum_level=maximum_level, max_num_particles=maximum_particles)
+    octree = build(points=particles, max_level=maximum_level, max_points=maximum_particles)
     print(f"Build runtime: {time.time()-start}")
 
     depth = max(morton.find_level(np.unique(octree)))

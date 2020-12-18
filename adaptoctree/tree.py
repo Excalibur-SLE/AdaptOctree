@@ -1,5 +1,5 @@
 """
-Construct an adaptive linear octree form a set of points.
+Construct an adaptive balanced linear octree form a set of points.
 """
 
 import numba
@@ -8,35 +8,39 @@ import numpy as np
 import adaptoctree.morton as morton
 
 
-@numba.njit(parallel=True)
-def build(particles, maximum_level=16, max_num_particles=100, first_level=1):
+@numba.njit(parallel=True, cache=True)
+def build(points, max_level=16, max_points=100, start_level=1):
 
-    max_bound, min_bound = morton.find_bounds(particles)
-    octree_center = morton.find_center(max_bound, min_bound)
-    octree_radius = morton.find_radius(octree_center, max_bound, min_bound)
+    max_bound, min_bound = morton.find_bounds(points)
+    x0 = morton.find_center(max_bound, min_bound)
+    r0 = morton.find_radius(x0, max_bound, min_bound)
 
-    morton_keys = morton.encode_points_smt(
-        particles, first_level, octree_center, octree_radius
+    keys = morton.encode_points_smt(
+        points, start_level, x0, r0
     )
-    unique_indices = np.unique(morton_keys)
-    n_unique_indices = len(unique_indices)
-    for index in numba.prange(n_unique_indices):
-        todo_indices = np.where(morton_keys == unique_indices[index])[0]
-        build_implementation(
-            particles,
-            maximum_level,
-            max_num_particles,
-            octree_center,
-            octree_radius,
-            morton_keys,
+    unique_keys = np.unique(keys)
+    n_unique_keys = len(unique_keys)
+
+    for key_idx in numba.prange(n_unique_keys):
+
+        todo_indices = np.where(keys == unique_keys[key_idx])[0]
+
+        _build(
+            points,
+            max_level,
+            max_points,
+            x0,
+            r0,
+            keys,
             todo_indices,
-            first_level,
+            start_level,
         )
-    return morton_keys
+
+    return keys
 
 
-@numba.njit
-def build_implementation(
+@numba.njit(cache=True)
+def _build(
     particles,
     maximum_level,
     max_num_particles,
@@ -73,7 +77,7 @@ def build_implementation(
     return morton_keys
 
 
-@numba.njit
+@numba.njit(cache=True)
 def process_level(sorted_indices, morton_keys, max_num_particles):
     """Process a level."""
     count = 0
@@ -97,7 +101,7 @@ def process_level(sorted_indices, morton_keys, max_num_particles):
     return todo
 
 
-@numba.njit
+@numba.njit(cache=True)
 def remove_overlaps(tree, depth):
     """
     Perform BFS, for each node in the linear octree, and remove if
@@ -122,7 +126,7 @@ def remove_overlaps(tree, depth):
         -----------
         root : np.int64
             Root of BFS.
-        tree : np.array(dtype=np.int64)
+        tree : {np.int64}
             Linear octree.
         depth : np.int64
             Maximum depth of octree.
@@ -132,7 +136,6 @@ def remove_overlaps(tree, depth):
         {np.int64}
             Set of overlapping children, if they exist.
         """
-        # tree = set(tree)
         queue = [root]
 
         overlaps = set()
@@ -163,7 +166,7 @@ def remove_overlaps(tree, depth):
     return unique
 
 
-@numba.njit
+@numba.njit(cache=True)
 def balance_helper(tree, depth):
     """
     Perform balancing to enforece the 2:1 constraint between neighbouring
@@ -228,14 +231,29 @@ def assign_points_to_keys(points, tree, x0, r0):
     """
     # Map Morton key to bounds that they represent.
     n_points = points.shape[0]
-    n_keys = len(tree)
-    leaves = np.zeros(n_points, dtype=np.int64)
+    leaves = -1*np.ones(n_points, dtype=np.int64)
 
     # Loop over points, and assign to a node from the tree by examining the bounds
     for i, point in enumerate(points):
         for key in tree:
             lower_bound, upper_bound = morton.find_node_bounds(key, x0, r0)
-            if (np.all(lower_bound <= point)) and (np.all(point < upper_bound )):
+            if (np.all(lower_bound <= point)) and (np.all(point < upper_bound)):
                 leaves[i] = key
 
     return leaves
+
+
+@numba.njit(cache=True)
+def find_depth(tree):
+    """
+    Return maximum depth of a linear octree.
+
+    Parameters:
+    -----------
+    tree : np.array(np.int64)
+
+    Return:
+    -------
+    np.int64
+    """
+    return max(morton.find_level(np.unique(tree)))
