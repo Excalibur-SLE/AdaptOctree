@@ -989,4 +989,4 @@ def find_node_bounds(key, x0, r0):
     lower_bound = center - displacement
     upper_bound = center + displacement
 
-    return np.vstack((lower_bound, upper_bound))
+    return lower_bound, upper_bound
