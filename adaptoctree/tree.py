@@ -190,11 +190,13 @@ def balance_helper(tree, depth):
 
         for q in Q:
             parent = morton.find_parent(q)
-            neighbours = set(morton.find_neighbours(q))
-            parent_neighbours = set(morton.find_neighbours(parent))
+            neighbours = morton.find_neighbours(q)
 
-            balanced.update(parent_neighbours)
-            balanced.update(neighbours)
+            # Add neighbours, and neighbour siblings - may overlap
+            siblings = set(morton.find_siblings(q))
+            for n in neighbours:
+                balanced.update(set(morton.find_siblings(n)))
+                balanced.update(set([morton.find_parent(n)]))
 
     return numba.typed.List(balanced)
 
