@@ -53,7 +53,6 @@ MAXIMUM_LEVEL = 16
 def find_center_from_anchor(anchor, x0, r0):
     """
     Find center of given Octree node from it's anchor.
-
     Parameters:
     -----------
     anchor : np.array(shape=(4,), dtype=np.int32)
@@ -61,7 +60,6 @@ def find_center_from_anchor(anchor, x0, r0):
         Center of root node of Octree.
     r0 : np.float32
         Half side length of root node.
-
     Returns:
     --------
     np.array(shape=(3,), dtype=np.float32)
@@ -80,7 +78,6 @@ def find_center_from_anchor(anchor, x0, r0):
 def find_center_from_key(key, x0, r0):
     """
     Find the center of a given Octree node from it's Morton key.
-
     Parameters:
     -----------
     key : np.int64
@@ -89,7 +86,6 @@ def find_center_from_key(key, x0, r0):
         Center of root node of Octree.
     r0 : np.float32
         Half side length of root node.
-
     Returns:
     --------
     np.array(shape=(3,))
@@ -102,12 +98,10 @@ def find_center_from_key(key, x0, r0):
 def find_level(key):
     """
     Find the last 15 bits of a key, corresponding to a level.
-
     Parameters:
     -----------
     key : np.int64
         Morton key.
-
     Returns:
     --------
     np.int64
@@ -119,7 +113,6 @@ def find_level(key):
 def find_bounds(particles):
     """
     Find the maximum and minimum bounds describing a set of particles.
-
     Parameters:
     -----------
     particles : np.array()
@@ -138,12 +131,10 @@ def find_bounds(particles):
 def find_center(max_bound, min_bound):
     """
     Find center of an Octree domain described by a minimum and maximum bound.
-
     Parameters:
     -----------
     max_bound : np.array(shape=(3,), dtype=np.float32)
     min_bound : np.array(shape=(3,), dtype=np.float32)
-
     Returns:
     --------
     np.array(shape=(3,), dtype=np.float32)
@@ -178,7 +169,6 @@ def find_radius(center, max_bound, min_bound):
 def point_to_anchor(point, level, x0, r0):
     """
     Find the anchor of the octant in which a 3D Cartesian point lies.
-
     Parameters:
     -----------
     point : np.array(shape=(3,), dtype=np.float32)
@@ -188,7 +178,6 @@ def point_to_anchor(point, level, x0, r0):
         Center of root node of Octree.
     r0 : np.float32
         Half side length of root node.
-
     Returns:
     --------
     np.array(shape=(4,), dtype=np.int32)
@@ -208,7 +197,6 @@ def point_to_anchor(point, level, x0, r0):
 def encode_point(point, level, x0, r0):
     """
     Apply Morton encoding to a point.
-
     Parameters:
     -----------
     point : np.array(shape=(3,), dtype=np.float32)
@@ -217,7 +205,6 @@ def encode_point(point, level, x0, r0):
         Center of root node of Octree.
     r0 : np.float32
         Half side length of root node.
-
     Returns:
     --------
     np.int64
@@ -231,7 +218,6 @@ def encode_point(point, level, x0, r0):
 def encode_points(points, level, x0, r0):
     """
     Apply morton encoding to a set of points.
-
     Parameters:
     -----------
     points : np.array(shape=(N, 3), dtype=np.float32)
@@ -241,7 +227,6 @@ def encode_points(points, level, x0, r0):
         Center of root node of Octree.
     r0 : np.float32
         Half side length of root node.
-
     Returns:
     --------
     np.array(shape=(N,), dtype=np.int64)
@@ -268,7 +253,6 @@ def encode_points(points, level, x0, r0):
 def encode_points_smt(points, level, x0, r0):
     """
     Apply morton encoding to a set of points, using multi-threading.
-
     Parameters:
     -----------
     points : np.array(shape=(N, 3), dtype=np.float64)
@@ -278,7 +262,6 @@ def encode_points_smt(points, level, x0, r0):
         Center of root node of Octree.
     r0 : np.float64
         Half side length of root node.
-
     Returns:
     --------
     np.array(shape=(N,), dtype=np.int64)
@@ -309,11 +292,9 @@ def encode_anchor(anchor):
         The strategy is to examine each coordinate byte by byte, from most to
         least significant bytes, and find interleaving using the lookup table.
         Finally, level information is appended to the tail.
-
     Parameters:
     -----------
     anchor : np.array(shape=(4,), dtype=np.int32)
-
     Returns:
     --------
     np.int64
@@ -346,11 +327,9 @@ def encode_anchor(anchor):
 def encode_anchors(anchors):
     """
     Morton encode a set of anchors.
-
     Parameters:
     -----------
     anchors : np.array(shape=(N, 4), dtype=np.int32)
-
     Returns:
     --------
     np.array(shape=(N,), np.int64)
@@ -371,11 +350,9 @@ def decode_key(key):
     the 64 bit key 3 bytes at a time, and extract 8 of the x, y and z bits
     from this chunk of 3 bytes. This chunking is iterative, and will therefore
     be significantly slower than the lookup based encoding.
-
     Paramters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.array(shape=(4,), np.int32)
@@ -413,7 +390,6 @@ def decode_key(key):
 def decode_key_lut_helper(key, lookup_table, start_shift):
     """
     Helper method for Morton key decode method that uses lookup tables.
-
     Parameters:
     -----------
     key : np.int64
@@ -433,11 +409,9 @@ def decode_key_lut_helper(key, lookup_table, start_shift):
 def decode_key_lut(key):
     """
     Decode a Morton key, return an anchor, using the provided lookup tables.
-
     Parameters:
     -----------
     key : np.int64
-
     Returns:
     --------
     np.array(shape=(4,), dtype=npint32)
@@ -456,7 +430,6 @@ def decode_key_lut(key):
 def find_parent(key):
     """
     Find parent of an octant.
-
     Parameters:
     -----------
     key : np.int64
@@ -483,11 +456,9 @@ def find_parent(key):
 def find_children(key):
     """
     Find children of key
-
     Parameters:
     -----------
     key : np.int64
-
     Returns:
     --------
     np.array(shape=(8,), dtype=np.int64)
@@ -509,12 +480,10 @@ def find_children(key):
 def find_descendents(key, N):
     """
     Find all descendents N levels down tree from key.
-
     Parameters:
     -----------
     key : np.int64
     N : np.int64
-
     Returns:
     --------
     np.array(dtype=np.int64)
@@ -538,12 +507,10 @@ def find_descendents(key, N):
 def find_siblings(key):
     """
     Find the siblings of key.
-
     Parameters:
     -----------
     key : np.int64
         Morton key
-
     Returns:
     --------
     np.array(shape=(8,), dtype=np.int64)
@@ -573,14 +540,12 @@ def find_siblings(key):
 def not_sibling(a, b):
     """
     Check if octant a is not a sibling of octant b.
-
     Parameters:
     -----------
     a : np.int64
         Morton key
     b : np.int64
         Morton key
-
     Returns:
     --------
     bool
@@ -594,11 +559,11 @@ def not_sibling(a, b):
     if level_a != level_b:
         return True
 
-    # Remove level, and smallest degree bits
+    # Remove level, and smallest degree bits
     a = a >> (LEVEL_DISPLACEMENT+3)
     b = b >> (LEVEL_DISPLACEMENT+3)
 
-    # Check if a and b share same root
+    # Check if a and b share same root
     root_not_same = a^b
     return bool(root_not_same)
 
@@ -608,11 +573,9 @@ def not_sibling(a, b):
 def decrement_x(key):
     """
     Decrement a Morton Key in the x direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -624,11 +587,9 @@ def decrement_x(key):
 def decrement_y(key):
     """
     Decrement a Morton Key in the y direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -640,11 +601,9 @@ def decrement_y(key):
 def decrement_z(key):
     """
     Decrement a Morton Key in the z direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -656,11 +615,9 @@ def decrement_z(key):
 def increment_x(key):
     """
     Increment a Morton Key in the x direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -673,11 +630,9 @@ def increment_x(key):
 def increment_y(key):
     """
     Increment a Morton Key in the y direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -689,11 +644,9 @@ def increment_y(key):
 def increment_z(key):
     """
     Increment a Morton Key in the z direction.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -705,11 +658,9 @@ def increment_z(key):
 def find_neighbours(key):
     """
     Compute all neighbours at the same level, even if node at a boundary.
-
     Parameters:
     -----------
     key: np.int64
-
     Returns:
     --------
     np.array(shape=(26,), dtype=np.int64)
@@ -775,11 +726,9 @@ def find_neighbours(key):
 def find_ancestors(key):
     """
     Find Morton key of all ancestors, including the key itself.
-
     Parameters:
     -----------
     key : np.int64
-
     Returns:
     --------
     {np.int64}
@@ -803,12 +752,10 @@ def find_ancestors(key):
 def larger_than(a, b):
     """
     Check if Morton key 'a' is larger than 'b'.
-
     Parameters:
     -----------
     a : np.int64
     b : np.int64
-
     Returns:
     --------
     np.int64
@@ -832,11 +779,9 @@ def larger_than(a, b):
 def nlz(key):
     """
     Explicitly calculate the number of leading zeroes in a Morton key.
-
     Parameters:
     ----------
     key : np.int64
-
     Returns:
     --------
     np.int64
@@ -855,11 +800,9 @@ def nlz(key):
 def bit_length(x):
     """
     Calculate the bit length of an integer.
-
     Parameters:
     -----------
     x : np.int64
-
     Returns:
     --------
     np.int64
@@ -875,7 +818,6 @@ def bit_length(x):
 def _partition(tree, low, high):
     """
     Helper method for quicksort implementation for Morton keys.
-
     Parameters:
     -----------
     tree : np.array(np.int64)
@@ -884,7 +826,6 @@ def _partition(tree, low, high):
         Low index of partition.
     high : np.int64
         High index of partition.
-
     Returns:
     --------
     np.int64
@@ -906,7 +847,6 @@ def _partition(tree, low, high):
 def quicksort(tree, low, high):
     """
     Quicksort using Morton key special comparison.
-
     Parameters:
     -----------
     tree : np.array(dtype=np.int64)
@@ -926,7 +866,6 @@ def quicksort(tree, low, high):
 def are_neighbours(a, b, x0, r0):
     """
     Check if nodes 'a' and 'b' are neighbours.
-
     Parameters:
     -----------
     a : np.int64
@@ -937,7 +876,6 @@ def are_neighbours(a, b, x0, r0):
         Center of root node of Octree.
     r0 : np.float64
         Half side length of root node.
-
     Returns:
     --------
     bool
