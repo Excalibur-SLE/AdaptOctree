@@ -58,13 +58,9 @@ def test_find_level(key, expected):
 
 
 @pytest.mark.parametrize(
-    "sources, targets, expected_max_bound, expected_min_bound",
+    "sources, expected_max_bound, expected_min_bound",
     [
         (np.array([
-            [1, 1, 1],
-            [2, 2, 2]
-        ], dtype=np.float32),
-       np.array([
             [1, 1, 1],
             [2, 2, 2]
         ], dtype=np.float32),
@@ -73,9 +69,9 @@ def test_find_level(key, expected):
         )
     ]
 )
-def test_find_bounds(sources, targets, expected_max_bound, expected_min_bound):
+def test_find_bounds(sources, expected_max_bound, expected_min_bound):
 
-    result = morton.find_bounds(sources, targets)
+    result = morton.find_bounds(sources)
     assert np.array_equal(result[0], expected_max_bound)
     assert np.array_equal(result[1], expected_min_bound)
 
@@ -87,7 +83,7 @@ def test_find_bounds(sources, targets, expected_max_bound, expected_min_bound):
             np.array([1, 1, 1], dtype=np.float32),
             np.array([2, 2, 2], dtype=np.float32),
             np.array([0, 0, 0], dtype=np.float32),
-            np.float32(1+1e-5)
+            1+1e-10
         )
     ]
 )
@@ -113,7 +109,6 @@ def test_point_to_anchor(point, level, x0, r0, expected):
 
     result = morton.point_to_anchor(point, level, x0, r0)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int32)
 
 
 @pytest.mark.parametrize(
@@ -149,7 +144,6 @@ def test_encode_point(point, level, x0, r0, expected):
 def test_encode_points(points, level, x0, r0, expected):
     result = morton.encode_points(points, level, x0, r0)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int64)
 
 
 @pytest.mark.parametrize(
@@ -178,7 +172,6 @@ def test_encode_anchor(anchor, expected):
 def test_encode_anchors(anchors, expected):
     result = morton.encode_anchors(anchors)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int64)
 
 
 @pytest.mark.parametrize(
@@ -190,7 +183,6 @@ def test_encode_anchors(anchors, expected):
 def test_decode_key(key, expected):
     result = morton.decode_key(key)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int16)
 
 
 @pytest.mark.parametrize(
@@ -202,7 +194,6 @@ def test_decode_key(key, expected):
 def test_find_siblings(key, expected):
     result = np.sort(morton.find_siblings(key))
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int64)
 
 
 @pytest.mark.parametrize(
@@ -245,7 +236,6 @@ def test_find_neighbours(key, expected):
 def test_find_parent(key, expected):
     result = morton.find_parent(key)
     assert result == expected
-    assert isinstance(result, np.int64)
 
 
 @pytest.mark.parametrize(
@@ -265,7 +255,7 @@ def test_find_node_bounds(key, x0, r0, expected):
 @pytest.mark.parametrize(
     "a, b, expected",
     [
-        # (1, 229377, True),
+        (1, 229377, True),
         (2, 2064386, False)
     ]
 )
