@@ -1,4 +1,4 @@
-# AdaptOctree
+<h1 align='center'> AdaptOctree </h1>
 
 AdaptOctree is an implementation of Adaptive Linear Octrees in Python, and it's numeric ecosystem.
 
