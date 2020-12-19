@@ -64,3 +64,10 @@ target/
 # VSCode stuff
 .vscode/*
 .vscode//*/*
+
+# Notebooks
+.ipynb_checkpoints/*
+*.ipynb
+./*.ipynb
+./*/*.ipynb
+*/.ipynb_checkpoints/*
