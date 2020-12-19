@@ -13,7 +13,6 @@ def build(points, max_level=16, max_points=100, start_level=1):
     """
     Build an unbalanced linear Morton encoded octree, that satisfied a the
         constraint of at most 'max_points' points per node.
-
     Parameters:
     -----------
     points : np.array(shape=(N, 3), dtype=np.float32)
@@ -24,7 +23,6 @@ def build(points, max_level=16, max_points=100, start_level=1):
         Maximum number of points per node.
     start_level : np.int64
         Level at which to start tree construction from.
-
     Returns:
     --------
     np.array(shape=(N,), dtype=np.int64)
@@ -65,12 +63,10 @@ def build_helper(
     Build helper function. Works in-place on batches of points with same Morton
         key at the coarsest level 'start_level', and maintaining the max
         particles per node constraint.
-
         Strategy: For all particles in a given octant of the root node at the
         'start_level', calculate if any child octants violate the max_particles
         constraint - if they do, then repartition the particles into the
         grand child octants, and so on, until the constraint is satisfied.
-
     Parameters:
     -----------
     points : np.array(shape=(N, 3), dtype=np.float32)
@@ -123,7 +119,6 @@ def find_work_items(sorted_work_indices, keys, max_points):
     Process a level, to find the work items corresponding to particles that
         occupy a certain node that exceed the maximum points per node threshold.
         This method returns the global indices of these particles.
-
     Parameters:
     -----------
     sorted_work_indices : np.array(dtype=np.int64)
@@ -133,7 +128,6 @@ def find_work_items(sorted_work_indices, keys, max_points):
         All morton keys thus far encoded, mutable.
     max_points : np.int64
         The maximum points per node constraint.
-
     Returns:
     --------
     List([numba.types.int64])
@@ -170,12 +164,10 @@ def remove_overlaps(tree, depth):
     """
     Perform BFS, for each node in the linear octree, and remove if
         it overlaps with any present descendents in the tree.
-
     Parameters:
     -----------
     tree : np.array(dtype=np.int64)
     depth : np.int64
-
     Returns:
     --------
     {np.int64}
@@ -185,7 +177,6 @@ def remove_overlaps(tree, depth):
         """
         Perform breadth-first search starting from a given root, to find
             children in the tree that it overlaps with.
-
         Parameters:
         -----------
         root : np.int64
@@ -194,7 +185,6 @@ def remove_overlaps(tree, depth):
             Linear octree.
         depth : np.int64
             Maximum depth of octree.
-
         Returns:
         --------
         {np.int64}
@@ -235,12 +225,10 @@ def balance_helper(tree, depth):
     """
     Perform balancing to enforece the 2:1 constraint between neighbouring
         nodes in linear octree.
-
     Parameters:
     -----------
     tree : np.array(dtype=np.int64)
     depth : np.int64
-
     Returns:
     --------
     {np.int64}
@@ -266,12 +254,10 @@ def balance_helper(tree, depth):
 def balance(tree, depth):
     """
     Wrapper for JIT'd balance functions.
-
     Parameters:
     -----------
     tree : np.array(dtype=np.int64)
     depth : np.int64
-
     Returns:
     --------
     np.array(np.int64)
@@ -313,11 +299,9 @@ def assign_points_to_keys(points, tree, x0, r0):
 def find_depth(tree):
     """
     Return maximum depth of a linear octree.
-
     Parameters:
     -----------
     tree : np.array(np.int64)
-
     Return:
     -------
     np.int64
