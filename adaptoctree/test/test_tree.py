@@ -10,17 +10,17 @@ import adaptoctree.tree as tree
 
 @pytest.fixture
 def points():
-    return np.random.rand(1000, 3)
+    return np.random.rand(1000, 3).astype(np.float32)
 
 
 @pytest.fixture
 def max_level():
-    return 16
+    return np.int32(16)
 
 
 @pytest.fixture
 def max_points():
-    return 100
+    return np.int32(100)
 
 
 @pytest.fixture
@@ -28,7 +28,8 @@ def unbalanced(points, max_level, max_points):
     return tree.build(
         points=points,
         max_level=max_level,
-        max_points=max_points
+        max_points=max_points,
+        start_level=np.int32(0)
     )
 
 

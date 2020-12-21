@@ -6,56 +6,53 @@ import numba
 import numpy as np
 
 import adaptoctree.morton as morton
+import adaptoctree.types as types
 
 
-@numba.njit(parallel=True, cache=True)
-def build(points, max_level=16, max_points=100, start_level=1):
+@numba.njit(
+    [types.LongIntList(types.LongArray, types.Keys, types.Int)],
+    cache=True
+)
+def find_work_items(sorted_work_indices, keys, max_points):
     """
-    Build an unbalanced linear Morton encoded octree, that satisfied a the
-        constraint of at most 'max_points' points per node.
-    Parameters:
-    -----------
-    points : np.array(shape=(N, 3), dtype=np.float32)
-        Points in R3.
-    max_level : np.int64
-        Maximum level of the octree.
-    max_points : np.int64
-        Maximum number of points per node.
-    start_level : np.int64
-        Level at which to start tree construction from.
-    Returns:
-    --------
-    np.array(shape=(N,), dtype=np.int64)
-        Morton key corresponding to each point.
+    Process a level, to find the work items corresponding to particles that
+        occupy a certain node that exceed the maximum points per node threshold.
+        This method returns the global indices of these particles.
     """
+    count = 0
+    pivot = keys[sorted_work_indices[0]]
+    nindices = len(sorted_work_indices)
 
-    max_bound, min_bound = morton.find_bounds(points)
-    x0 = morton.find_center(max_bound, min_bound)
-    r0 = morton.find_radius(x0, max_bound, min_bound)
+    todo = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
+    trial_set = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
 
-    keys = morton.encode_points_smt(points, start_level, x0, r0)
-    unique_keys = np.unique(keys)
-    n_unique_keys = len(unique_keys)
+    for index in range(nindices):
+        if keys[sorted_work_indices[index]] != pivot:
+            if count > max_points:
+                todo.extend(trial_set)
+            trial_set.clear()
+            pivot = keys[sorted_work_indices[index]]
+            count = 0
+        count += 1
+        trial_set.append(sorted_work_indices[index])
 
-    for key_idx in numba.prange(n_unique_keys):
+    # The last element in the for-loop might have
+    # a too large count. Need to process this as well
+    if count > max_points:
+        todo.extend(trial_set)
 
-        work_indices = np.where(keys == unique_keys[key_idx])[0]
+    return todo
 
-        build_helper(
-            points=points,
-            max_level=max_level,
-            max_points=max_points,
-            x0=x0,
-            r0=r0,
-            keys=keys,
-            work_indices=work_indices,
-            start_level=start_level,
+
+@numba.njit(
+    [
+        types.Void(
+            types.Coords, types.Int, types.Int, types.Coord,
+            types.Float, types.Keys, types.LongArray, types.Int
         )
-
-    return keys
-
-
-@numba.njit(cache=True)
+    ],
+    cache=True
+)
 def build_helper(
     points, max_level, max_points, x0, r0, keys, work_indices, start_level
 ):
@@ -63,27 +60,11 @@ def build_helper(
     Build helper function. Works in-place on batches of points with same Morton
         key at the coarsest level 'start_level', and maintaining the max
         particles per node constraint.
+
         Strategy: For all particles in a given octant of the root node at the
         'start_level', calculate if any child octants violate the max_particles
         constraint - if they do, then repartition the particles into the
         grand child octants, and so on, until the constraint is satisfied.
-    Parameters:
-    -----------
-    points : np.array(shape=(N, 3), dtype=np.float32)
-        Points in R3.
-    max_level : np.int64
-        Maximum level of the octree.
-    x0 : np.array(shape=(3,), dtype=np.float64)
-        Center of root node of Octree.
-    r0 : np.float64
-        Half side length of root node.
-    keys : np.array(shape=(N,), dtype=np.int64)
-        Morton encodings at coarsest level 'start_level'.
-    work_indices : np.array(dtype=np.int64)
-        Global, in a sense, indices of the whole points dataset, corresponding
-        to particles with the current key under consideration.
-    start_level : np.int64
-        Level at which to start tree construction from.
     """
 
     level = start_level
@@ -113,70 +94,57 @@ def build_helper(
         level += 1
 
 
-@numba.njit(cache=True)
-def find_work_items(sorted_work_indices, keys, max_points):
+@numba.njit(
+    [types.Keys(types.Coords, types.Int, types.Int, types.Int)],
+    parallel=True, cache=True
+)
+def build(points, max_level, max_points, start_level):
     """
-    Process a level, to find the work items corresponding to particles that
-        occupy a certain node that exceed the maximum points per node threshold.
-        This method returns the global indices of these particles.
-    Parameters:
-    -----------
-    sorted_work_indices : np.array(dtype=np.int64)
-        Sorted array of indices, that are being worked on. Correspond to a shared
-        ancestor in the coarsest level (start_level).
-    keys : np.array(dtype=np.int64)
-        All morton keys thus far encoded, mutable.
-    max_points : np.int64
-        The maximum points per node constraint.
-    Returns:
-    --------
-    List([numba.types.int64])
-        List corresponding to the indices of keys which do not satisfy the
-        max particles per node constraint.
+    Build an unbalanced linear Morton encoded octree, that satisfied a the
+        constraint of at most 'max_points' points per node.
     """
-    count = 0
-    pivot = keys[sorted_work_indices[0]]
-    nindices = len(sorted_work_indices)
 
-    todo = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
-    trial_set = numba.typed.List.empty_list(numba.types.int64, allocated=nindices)
+    max_bound, min_bound = morton.find_bounds(points)
+    x0 = morton.find_center(max_bound, min_bound)
+    r0 = morton.find_radius(x0, max_bound, min_bound)
 
-    for index in range(nindices):
-        if keys[sorted_work_indices[index]] != pivot:
-            if count > max_points:
-                todo.extend(trial_set)
-            trial_set.clear()
-            pivot = keys[sorted_work_indices[index]]
-            count = 0
-        count += 1
-        trial_set.append(sorted_work_indices[index])
+    keys = morton.encode_points_smt(points, start_level, x0, r0)
+    unique_keys = np.unique(keys)
+    n_unique_keys = len(unique_keys)
 
-    # The last element in the for-loop might have
-    # a too large count. Need to process this as well
-    if count > max_points:
-        todo.extend(trial_set)
+    for key_idx in numba.prange(n_unique_keys):
 
-    return todo
+        work_indices = np.where(keys == unique_keys[key_idx])[0]
+
+        build_helper(
+            points=points,
+            max_level=max_level,
+            max_points=max_points,
+            x0=x0,
+            r0=r0,
+            keys=keys,
+            work_indices=work_indices,
+            start_level=start_level,
+        )
+
+    return keys
 
 
-@numba.njit(cache=True)
+@numba.njit(
+    [types.KeySet(types.KeyList, types.Int)],
+    cache=True
+)
 def remove_overlaps(tree, depth):
     """
     Perform BFS, for each node in the linear octree, and remove if
         it overlaps with any present descendents in the tree.
-    Parameters:
-    -----------
-    tree : np.array(dtype=np.int64)
-    depth : np.int64
-    Returns:
-    --------
-    {np.int64}
     """
 
     def bfs(root, tree, depth):
         """
         Perform breadth-first search starting from a given root, to find
             children in the tree that it overlaps with.
+
         Parameters:
         -----------
         root : np.int64
@@ -185,6 +153,7 @@ def remove_overlaps(tree, depth):
             Linear octree.
         depth : np.int64
             Maximum depth of octree.
+
         Returns:
         --------
         {np.int64}
@@ -220,19 +189,14 @@ def remove_overlaps(tree, depth):
     return unique
 
 
-@numba.njit(cache=True)
+@numba.njit(
+    [types.KeyList(types.Keys, types.Int)],
+    cache=True
+)
 def balance_helper(tree, depth):
     """
     Perform balancing to enforece the 2:1 constraint between neighbouring
         nodes in linear octree.
-    Parameters:
-    -----------
-    tree : np.array(dtype=np.int64)
-    depth : np.int64
-    Returns:
-    --------
-    {np.int64}
-        Balanced linear octree, containing overlaps.
     """
     balanced = set(tree)
 
@@ -254,14 +218,16 @@ def balance_helper(tree, depth):
 def balance(tree, depth):
     """
     Wrapper for JIT'd balance functions.
+
     Parameters:
     -----------
     tree : np.array(dtype=np.int64)
     depth : np.int64
+
     Returns:
     --------
-    np.array(np.int64)
-        Balanced octree
+    {np.int64}
+        Balanced octree set
     """
     return  remove_overlaps(balance_helper(tree, depth), depth)
 
@@ -295,7 +261,10 @@ def assign_points_to_keys(points, tree, x0, r0):
     return leaves
 
 
-@numba.njit(cache=True)
+@numba.njit(
+    [types.Long(types.Keys)],
+    cache=True
+)
 def find_depth(tree):
     """
     Return maximum depth of a linear octree.

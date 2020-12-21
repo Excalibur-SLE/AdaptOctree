@@ -99,19 +99,12 @@ def find_center_from_key(key, x0, r0):
     return find_center_from_anchor(anchor, x0, r0)
 
 
-@numba.jit
+@numba.jit(
+    [types.Long(types.Key), types.LongArray(types.Keys)]
+)
 def find_level(key):
     """
     Find the last 15 bits of a key, corresponding to a level.
-
-    Parameters:
-    -----------
-    key : np.int64
-        Morton key.
-
-    Returns:
-    --------
-    np.int64
     """
     return key & LEVEL_MASK
 
