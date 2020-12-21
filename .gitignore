@@ -60,3 +60,14 @@ target/
 
 # pyenv python configuration file
 .python-version
+
+# VSCode stuff
+.vscode/*
+.vscode//*/*
+
+# Notebooks
+.ipynb_checkpoints/*
+*.ipynb
+./*.ipynb
+./*/*.ipynb
+*/.ipynb_checkpoints/*
