@@ -10,7 +10,7 @@ import adaptoctree.types as types
 
 
 @numba.njit(
-    [types.LongIntList(types.LongArray, types.Keys, types.Int)],
+    [types.LongIntList(types.LongArray, types.Keys, types.Long)],
     cache=True
 )
 def find_work_items(sorted_work_indices, keys, max_points):
@@ -47,8 +47,8 @@ def find_work_items(sorted_work_indices, keys, max_points):
 @numba.njit(
     [
         types.Void(
-            types.Coords, types.Int, types.Int, types.Coord,
-            types.Float, types.Keys, types.LongArray, types.Int
+            types.Coords, types.Long, types.Long, types.Coord,
+            types.Double, types.Keys, types.LongArray, types.Int
         )
     ],
     cache=True
@@ -95,7 +95,7 @@ def build_helper(
 
 
 @numba.njit(
-    [types.Keys(types.Coords, types.Int, types.Int, types.Int)],
+    [types.Keys(types.Coords, types.Long, types.Long, types.Long)],
     parallel=True, cache=True
 )
 def build(points, max_level, max_points, start_level):
@@ -131,7 +131,7 @@ def build(points, max_level, max_points, start_level):
 
 
 @numba.njit(
-    [types.KeySet(types.KeyList, types.Int)],
+    [types.KeySet(types.KeyList, types.Long)],
     cache=True
 )
 def remove_overlaps(tree, depth):
@@ -190,7 +190,7 @@ def remove_overlaps(tree, depth):
 
 
 @numba.njit(
-    [types.KeyList(types.Keys, types.Int)],
+    [types.KeyList(types.Keys, types.Long)],
     cache=True
 )
 def balance_helper(tree, depth):
@@ -268,11 +268,6 @@ def assign_points_to_keys(points, tree, x0, r0):
 def find_depth(tree):
     """
     Return maximum depth of a linear octree.
-    Parameters:
-    -----------
-    tree : np.array(np.int64)
-    Return:
-    -------
-    np.int64
     """
-    return max(morton.find_level(np.unique(tree)))
+    levels = morton.find_level(np.unique(tree))
+    return np.max(levels)

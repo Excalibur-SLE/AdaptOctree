@@ -58,24 +58,20 @@ def test_find_level(key, expected):
 
 
 @pytest.mark.parametrize(
-    "sources, targets, expected_max_bound, expected_min_bound",
+    "points, expected_max_bound, expected_min_bound",
     [
         (np.array([
             [1, 1, 1],
             [2, 2, 2]
-        ], dtype=np.float32),
-       np.array([
-            [1, 1, 1],
-            [2, 2, 2]
-        ], dtype=np.float32),
-        np.array([2, 2, 2], dtype=np.float32),
-        np.array([1, 1, 1], dtype=np.float32)
+        ], dtype=np.float64),
+        np.array([2, 2, 2], dtype=np.float64),
+        np.array([1, 1, 1], dtype=np.float64)
         )
     ]
 )
-def test_find_bounds(sources, targets, expected_max_bound, expected_min_bound):
+def test_find_bounds(points, expected_max_bound, expected_min_bound):
 
-    result = morton.find_bounds(sources, targets)
+    result = morton.find_bounds(points)
     assert np.array_equal(result[0], expected_max_bound)
     assert np.array_equal(result[1], expected_min_bound)
 
@@ -84,10 +80,10 @@ def test_find_bounds(sources, targets, expected_max_bound, expected_min_bound):
     "center, max_bound, min_bound, expected",
     [
         (
-            np.array([1, 1, 1], dtype=np.float32),
-            np.array([2, 2, 2], dtype=np.float32),
-            np.array([0, 0, 0], dtype=np.float32),
-            np.float32(1+1e-5)
+            np.array([1, 1, 1], dtype=np.float64),
+            np.array([2, 2, 2], dtype=np.float64),
+            np.array([0, 0, 0], dtype=np.float64),
+            np.float64(1+1e-10)
         )
     ]
 )
@@ -101,11 +97,11 @@ def test_find_radius(center, max_bound, min_bound, expected):
     "point, level, x0, r0, expected",
     [
         (
-            np.array([0, 0, 0], dtype=np.float32),
-            np.int32(10),
-            np.array([1, 1, 1], dtype=np.float32),
-            np.float32(1),
-            np.array([0, 0, 0, 10], dtype=np.int32)
+            np.array([0, 0, 0], dtype=np.float64),
+            np.int64(10),
+            np.array([1, 1, 1], dtype=np.float64),
+            np.float64(1),
+            np.array([0, 0, 0, 10], dtype=np.int64)
         )
     ]
 )
@@ -113,17 +109,16 @@ def test_point_to_anchor(point, level, x0, r0, expected):
 
     result = morton.point_to_anchor(point, level, x0, r0)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int32)
 
 
 @pytest.mark.parametrize(
     "point, level, x0, r0, expected",
     [
         (
-            np.array([0, 0, 0], dtype=np.float32),
-            np.int32(1),
-            np.array([1, 1, 1], dtype=np.float32),
-            np.float32(1),
+            np.array([0, 0, 0], dtype=np.float64),
+            np.int64(1),
+            np.array([1, 1, 1], dtype=np.float64),
+            np.float64(1),
             np.int64(1)
         )
     ]
@@ -138,10 +133,10 @@ def test_encode_point(point, level, x0, r0, expected):
     "points, level, x0, r0, expected",
     [
         (
-            np.array([[0, 0, 0]], dtype=np.float32),
-            np.int32(1),
-            np.array([1, 1, 1], dtype=np.float32),
-            np.float32(1),
+            np.array([[0, 0, 0]], dtype=np.float64),
+            np.int64(1),
+            np.array([1, 1, 1], dtype=np.float64),
+            np.float64(1),
             np.array([1], dtype=np.int64)
         )
     ]
@@ -149,14 +144,13 @@ def test_encode_point(point, level, x0, r0, expected):
 def test_encode_points(points, level, x0, r0, expected):
     result = morton.encode_points(points, level, x0, r0)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int64)
 
 
 @pytest.mark.parametrize(
     "anchor, expected",
     [
         (
-            np.array([1, 1, 1, 1], dtype=np.int32),
+            np.array([1, 1, 1, 1], dtype=np.int64),
             np.int64(229377)
         )
     ]
@@ -170,27 +164,25 @@ def test_encode_anchor(anchor, expected):
     "anchors, expected",
     [
         (
-            np.array([[1, 1, 1, 1]], dtype=np.int32),
-            np.array([229377], dtype=np.int64)
+            np.array([1, 1, 1, 1, 1, 1, 1, 1], dtype=np.int64),
+            np.array([229377, 229377], dtype=np.int64)
         )
     ]
 )
 def test_encode_anchors(anchors, expected):
     result = morton.encode_anchors(anchors)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int64)
 
 
 @pytest.mark.parametrize(
     "key, expected",
     [
-        (1, np.array([0, 0, 0, 1], dtype=np.int16))
+        (1, np.array([0, 0, 0, 1], dtype=np.int64))
     ]
 )
 def test_decode_key(key, expected):
     result = morton.decode_key(key)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.int16)
 
 
 @pytest.mark.parametrize(
@@ -203,25 +195,6 @@ def test_find_siblings(key, expected):
     result = np.sort(morton.find_siblings(key))
     assert np.array_equal(result, expected)
     assert isinstance(result[0], np.int64)
-
-
-@pytest.mark.parametrize(
-    "a, b, expected",
-    [
-        (
-           np.int64(1), np.int64(32769), False
-        ),
-        (
-            np.int64(0), np.int64(1), True
-        ),
-        (
-            np.int64(2), np.int64(1), True
-        )
-    ]
-)
-def test_not_sibling(a, b, expected):
-    result = morton.not_sibling(a, b)
-    assert result == expected
 
 
 @pytest.mark.parametrize(
@@ -245,7 +218,6 @@ def test_find_neighbours(key, expected):
 def test_find_parent(key, expected):
     result = morton.find_parent(key)
     assert result == expected
-    assert isinstance(result, np.int64)
 
 
 @pytest.mark.parametrize(
