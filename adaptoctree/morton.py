@@ -20,15 +20,16 @@ from adaptoctree.morton_lookup import (
     Z_LOOKUP_ENCODE, Z_LOOKUP_DECODE
 )
 
+import adaptoctree.types as types
 
 # Number of bits used for level information
 LEVEL_DISPLACEMENT = 15
 
 # Mask for last 15 bits
-LEVEL_MASK = 0x7fff
+LEVEL_MASK = 0x7FFF
 
 # Mask for a lowest order byte
-BYTE_MASK = 0xff
+BYTE_MASK = 0xFF
 BYTE_DISPLACEMENT = 8
 
 # Mask for lowest order index bits

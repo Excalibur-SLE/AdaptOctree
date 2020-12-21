@@ -9,87 +9,90 @@ import adaptoctree.tree as tree
 
 
 @pytest.fixture
-def n_particles():
-    return 1000
+def points():
+    return np.random.rand(1000, 3)
 
 
 @pytest.fixture
-def sources(n_particles):
-    return np.random.rand(n_particles, 3)
-
-
-@pytest.fixture
-def maximum_level():
+def max_level():
     return 16
 
 
 @pytest.fixture
-def maximum_particles():
+def max_points():
     return 100
 
 
 @pytest.fixture
-def unbalanced(sources, maximum_level, maximum_particles):
-    built = tree.build(
-        particles=sources,
+def unbalanced(points, max_level, max_points):
+    return tree.build(
+        points=points,
+        max_level=max_level,
+        max_points=max_points
     )
 
-    return built
+
+@pytest.fixture
+def balanced(unbalanced):
+    tmp = tree.balance(unbalanced, tree.find_depth(unbalanced))
+    return np.fromiter(tmp, np.int64, len(tmp))
+
 
 
 @pytest.fixture
-def depth(unbalanced):
-    return max(morton.find_level(np.unique(unbalanced)))
+def octree_center(points):
+    min_bound, max_bound = morton.find_bounds(points)
+    return morton.find_center(min_bound, max_bound)
 
 
 @pytest.fixture
-def balanced(unbalanced, depth):
-    return tree.balance(unbalanced, depth)
-
-
-@pytest.fixture
-def bounds(sources):
-    return morton.find_bounds(sources)
-
-
-@pytest.fixture
-def octree_center(bounds):
-    return morton.find_center(*bounds)
-
-
-@pytest.fixture
-def octree_radius(octree_center, bounds):
-    return morton.find_radius(octree_center, *bounds)
+def octree_radius(octree_center, points):
+    min_bound, max_bound = morton.find_bounds(points)
+    return morton.find_radius(octree_center, max_bound, min_bound)
 
 
 def test_particle_constraint(
-        sources, unbalanced, balanced, octree_center,
-        octree_radius, maximum_particles
-        ):
+    unbalanced, balanced, max_points, points, octree_center, octree_radius
+):
     """
     Test that the number of particles in a leaf box doesn't exceed the user
         specified constraint for both the balanced and unbalanced trees.
     """
+
     assigned_unbalanced = tree.assign_points_to_keys(
-        sources, unbalanced, octree_center, octree_radius
+        points, unbalanced, octree_center, octree_radius
         )
     _, counts_unbalanced = np.unique(assigned_unbalanced, return_counts=True)
 
     assigned_balanced = tree.assign_points_to_keys(
-        sources, balanced, octree_center, octree_radius
+        points, balanced, octree_center, octree_radius
         )
 
     _, counts_balanced = np.unique(assigned_balanced, return_counts=True)
 
-    assert np.all(counts_unbalanced < maximum_particles)
-    assert np.all(counts_balanced < maximum_particles)
+    assert np.all(counts_unbalanced <= max_points)
+    assert np.all(counts_balanced <= max_points)
 
 
-# def test_tree_balancing(balanced, octree_center, octree_radius):
+def test_balance_constraint(balanced, octree_center, octree_radius):
+    """
+    Test that the 2:1 balance constraint is satisfied
+    """
 
-#     for key_i, level_i in balanced:
-#         for key_j, level_j in balanced:
-#             if key_i != key_j:
-#                 if morton.are_neighbours(key_i, key_j, octree_center, octree_radius):
-#                     assert abs(level_i-level_j) <= 1
+    for i in balanced:
+        for j in balanced:
+            if (i != j) and morton.are_neighbours(i, j, octree_center, octree_radius):
+                diff = abs(morton.find_level(i) - morton.find_level(j))
+                assert diff <= 1
 
+
+def test_no_overlaps(balanced):
+    """
+    Test that the final tree doesn't contain any overlaps
+    """
+
+    for i in balanced:
+        for j in balanced:
+            if i != j:
+                assert i not in morton.find_ancestors(j)
+                assert j not in morton.find_ancestors(i)
