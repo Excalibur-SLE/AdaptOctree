@@ -1,14 +1,13 @@
 from setuptools import setup
-import versioneer
 
 requirements = [
-    # package requirements go here
+    'numba',
+    'numpy',
 ]
 
 setup(
     name='AdaptOctree',
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
+    version='0.0.0',
     description="Parallel adaptive octrees in Python",
     license="BSD",
     author="Srinath Kailasa",
@@ -23,8 +22,6 @@ setup(
     install_requires=requirements,
     keywords='AdaptOctree',
     classifiers=[
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ]
 )
