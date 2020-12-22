@@ -13,6 +13,7 @@ Install from source into a Conda/Miniconda environment.
 ```bash
 # Clone repository
 git clone git@github.com:Excalibur-SLE/AdaptOctree.git
+cd AdaptOctree
 
 # Build Conda package
 conda build conda.recipe
