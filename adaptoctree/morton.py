@@ -48,7 +48,7 @@ XZ_MASK = types.Long(0b101101101101101101101101101101101101101101101101)
 XY_MASK = types.Long(0b011011011011011011011011011011011011011011011011)
 
 # Maximum level available within parameters of encoding
-MAXIMUM_LEVEL = 16
+MAXIMUM_LEVEL = types.Long(16)
 
 
 def find_center_from_anchor(anchor, x0, r0):
@@ -135,15 +135,6 @@ def find_bounds(particles):
 def find_center(max_bound, min_bound):
     """
     Find center of an Octree domain described by a minimum and maximum bound.
-
-    Parameters:
-    -----------
-    max_bound : np.array(shape=(3,), dtype=np.float32)
-    min_bound : np.array(shape=(3,), dtype=np.float32)
-
-    Returns:
-    --------
-    np.array(shape=(3,), dtype=np.float32)
     """
     center = (min_bound + max_bound) / 2
     return center
@@ -657,41 +648,10 @@ def larger_than(a, b):
         return 0
 
 
-@numba.njit
-def nlz(key):
-    """
-    Explicitly calculate the number of leading zeroes in a Morton key.
-
-    Parameters:
-    ----------
-    key : np.int64
-
-    Returns:
-    --------
-    np.int64
-    """
-    level = find_level(key)
-    expected_bits = 3*(MAXIMUM_LEVEL+1-level)
-    key = key >> LEVEL_DISPLACEMENT
-    found_bits = bit_length(key)
-
-    nlz = expected_bits - found_bits
-
-    return nlz
-
-
-@numba.njit
+@numba.njit([types.Long(types.Long), types.Int(types.Int)])
 def bit_length(x):
     """
     Calculate the bit length of an integer.
-
-    Parameters:
-    -----------
-    x : np.int64
-
-    Returns:
-    --------
-    np.int64
     """
 
     n = 0
@@ -699,6 +659,20 @@ def bit_length(x):
         x >>= 1
         n += 1
     return n
+
+
+@numba.njit([types.Long(types.Key)])
+def nlz(key):
+    """
+    Explicitly calculate the number of leading zeroes in a Morton key.
+    """
+    level = find_level(key)
+    expected_bits = 3*(MAXIMUM_LEVEL-level)
+    key = key >> LEVEL_DISPLACEMENT
+    found_bits = 3 - bit_length(key)
+    nlz = expected_bits + found_bits
+
+    return nlz
 
 
 def _partition(tree, low, high):

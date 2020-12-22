@@ -1,20 +1,33 @@
-from setuptools import setup
-import versioneer
+import os
+
+from setuptools import setup, find_packages
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+PATH_VERSION = os.path.join(HERE, 'adaptoctree', '__version.py')
+
+ABOUT = {}
+
+with open(PATH_VERSION, mode='r', encoding='utf-8') as f:
+    exec(f.read(), ABOUT)
 
 requirements = [
-    # package requirements go here
+    "numba",
+    "numpy",
+    "pytest"
 ]
 
+
 setup(
-    name='AdaptOctree',
-    version=versioneer.get_version(),
-    cmdclass=versioneer.get_cmdclass(),
-    description="Parallel adaptive octrees in Python",
+    name=ABOUT['__title__'],
+    version=ABOUT['__version__'],
+    description=ABOUT['__description__'],
     license="BSD",
     author="Srinath Kailasa",
-    author_email='srinath.kailasa.18@ucl.ac.uk',
+    author_email='srinathkailasa@gmail.com',
     url='https://github.com/excalibur-sle/AdaptOctree',
-    packages=['adaptoctree'],
+    packages=find_packages(
+        exclude=['*.test']
+    ),
     entry_points={
         'console_scripts': [
             'adaptoctree=adaptoctree.cli:cli'
@@ -23,8 +36,6 @@ setup(
     install_requires=requirements,
     keywords='AdaptOctree',
     classifiers=[
-        'Programming Language :: Python :: 2.7',
-        'Programming Language :: Python :: 3.6',
-        'Programming Language :: Python :: 3.7',
+        'Programming Language :: Python :: 3.8',
     ]
 )
