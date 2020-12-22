@@ -2,7 +2,7 @@
 
 AdaptOctree is an library to **build** and **balance** adaptive linear octrees in Python, and Python's numeric ecosystem.
 
-Adaptive linear octrees are a data structure useful in a large variety of scientific and numerical codes. Though AdaptOctree has been designed for use within PyExaFMM, a Pythonic Kernel Independent Fast Multipole Method implementation. However, it is quite happy to work on its own too.
+Adaptive linear octrees are a data structure useful in a large variety of scientific and numerical codes. Though AdaptOctree has been designed for use within [PyExaFMM](https://github.com/exafmm/pyexafmm), a Pythonic Kernel Independent Fast Multipole Method implementation. However, it is quite happy to work on its own too.
 
 AdaptOctree is a work in process, please do report issues as you find them.
 
