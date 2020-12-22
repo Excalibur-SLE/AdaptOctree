@@ -1,9 +1,10 @@
 <h1 align='center'> AdaptOctree </h1>
 
-AdaptOctree is an implementation of Adaptive Linear Octrees in Python, and it's numeric ecosystem.
+AdaptOctree is an library to **build** and **balance** adaptive linear octrees in Python, using and it's numeric ecosystem.
 
-AdaptOctree has been designed for use within PyExaFMM, a Pythonic Kernel Independent Fast Multipole Method
-implementation. However, it is quite happy to work on its own too.
+Adaptive linear octrees are a data structure useful in a large variety of scientific and numerical codes. Though AdaptOctree has been designed for use within PyExaFMM, a Pythonic Kernel Independent Fast Multipole Method implementation. However, it is quite happy to work on its own too.
+
+AdaptOctree is a work in process, please do report issues as you find them.
 
 # Installation
 
