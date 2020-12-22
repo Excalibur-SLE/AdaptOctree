@@ -1,19 +1,31 @@
-from setuptools import setup
+import os
+
+from setuptools import setup, find_packages
+
+HERE = os.path.abspath(os.path.dirname(__file__))
+PATH_VERSION = os.path.join(HERE, 'adaptoctree', '__version.py')
+
+ABOUT = {}
+
+with open(PATH_VERSION, mode='r', encoding='utf-8') as f:
+    exec(f.read(), ABOUT)
 
 requirements = [
-    'numba',
-    'numpy',
+    "numba",
+    "numpy",
 ]
 
 setup(
-    name='AdaptOctree',
-    version='0.0.0',
-    description="Parallel adaptive octrees in Python",
+    name=ABOUT['__title__'],
+    version=ABOUT['__version__'],
+    description=ABOUT['__description__'],
     license="BSD",
     author="Srinath Kailasa",
-    author_email='srinath.kailasa.18@ucl.ac.uk',
+    author_email='srinathkailasa@gmail.com',
     url='https://github.com/excalibur-sle/AdaptOctree',
-    packages=['adaptoctree'],
+    packages=find_packages(
+        exclude=['*.test']
+    ),
     entry_points={
         'console_scripts': [
             'adaptoctree=adaptoctree.cli:cli'
