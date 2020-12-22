@@ -13,7 +13,9 @@ with open(PATH_VERSION, mode='r', encoding='utf-8') as f:
 requirements = [
     "numba",
     "numpy",
+    "pytest"
 ]
+
 
 setup(
     name=ABOUT['__title__'],
