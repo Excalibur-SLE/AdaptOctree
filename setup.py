@@ -28,6 +28,7 @@ setup(
     packages=find_packages(
         exclude=['*.test']
     ),
+    zip_safe=False,
     entry_points={
         'console_scripts': [
             'adaptoctree=adaptoctree.cli:cli'
