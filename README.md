@@ -41,6 +41,7 @@ import numpy as np
 import adaptoctree.morton as morton
 
 # Generate randomly distributed 3D points in a unit cube domain
+n_points = int(1e5)
 points = np.random.rand(n_points, 3)
 
 # Calculate implicit octree parameters
