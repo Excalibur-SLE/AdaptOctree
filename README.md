@@ -37,6 +37,7 @@ e.g. Generating the encodings for some points.
 
 ```python
 import numpy as np
+
 import adaptoctree.morton as morton
 
 # Generate randomly distributed 3D points in a unit cube domain
@@ -65,6 +66,8 @@ e.g. Building and balancing.
 
 ```python
 import numpy as np
+
+import adaptoctree.morton as morton
 import adaptoctree.tree as tree
 
 # Generate randomly distributed 3D points in a unit cube domain
