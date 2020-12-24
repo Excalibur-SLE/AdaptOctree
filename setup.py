@@ -29,11 +29,6 @@ setup(
         exclude=['*.test']
     ),
     zip_safe=False,
-    entry_points={
-        'console_scripts': [
-            'adaptoctree=adaptoctree.cli:cli'
-        ]
-    },
     install_requires=requirements,
     keywords='AdaptOctree',
     classifiers=[
