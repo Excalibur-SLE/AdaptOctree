@@ -207,10 +207,16 @@ def balance_helper(tree, depth):
         for q in Q:
             neighbours = morton.find_neighbours(q)
 
-            # Add neighbours, and neighbour siblings - may overlap
             for n in neighbours:
-                balanced.update(set(morton.find_siblings(n)))
-                balanced.update(set([morton.find_parent(n)]))
+                parent = morton.find_parent(n)
+                parent_level = l-1
+
+                if ~(n in balanced) and ~(parent in balanced):
+                    balanced.add(parent)
+
+                    if parent_level > 0:
+                        siblings = morton.find_siblings(parent)
+                        balanced.update(siblings)
 
     return numba.typed.List(balanced)
 
