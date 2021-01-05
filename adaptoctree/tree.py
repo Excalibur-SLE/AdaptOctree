@@ -178,11 +178,11 @@ def balance_subroutine(tree, depth):
         for work_item in work_items:
             neighbours = morton.find_neighbours(work_item)
 
-            for n in neighbours:
-                parent = morton.find_parent(n)
+            for neighbour in neighbours:
+                parent = morton.find_parent(neighbour)
                 parent_level = level-1
 
-                if ~(n in balanced) and ~(parent in balanced):
+                if ~(neighbour in balanced) and ~(parent in balanced):
 
                     balanced.add(parent)
 
