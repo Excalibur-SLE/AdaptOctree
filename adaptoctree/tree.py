@@ -137,6 +137,7 @@ def build(points, max_level, max_points, start_level):
 def remove_overlaps(tree, depth):
     """
     Remove the overlaps in a balanced octree.
+
         Strategy: Traverse the octree level by level, bottum-up, and check if
         any ancestors lie in the tree. If they do, then remove them.
     """
@@ -144,8 +145,6 @@ def remove_overlaps(tree, depth):
     result = set(tree)
 
     for level in range(depth, 0, -1):
-
-        # nodes at current level
         work_items = [x for x in tree if morton.find_level(x) == level]
 
         for work_item in work_items:
@@ -162,10 +161,11 @@ def remove_overlaps(tree, depth):
     [types.KeyList(types.Keys, types.Long)],
     cache=True
 )
-def balance_helper(tree, depth):
+def balance_subroutine(tree, depth):
     """
-    Perform balancing to enforece the 2:1 constraint between neighbouring
+    Perform balancing to enforce the 2:1 constraint between neighbouring
         nodes in linear octree.
+
         Strategy: Traverse the octree level by level, bottom-up, and check if
         the parent's of a given node's parent lie in the tree, add them and their
         respective siblings. This enforces the 2:1 constraint.
@@ -173,7 +173,6 @@ def balance_helper(tree, depth):
     balanced = set(tree)
 
     for level in range(depth, 0, -1):
-        # nodes at current level
         work_items = [x for x in balanced if morton.find_level(x) == level]
 
         for work_item in work_items:
@@ -208,7 +207,7 @@ def balance(tree, depth):
     {np.int64}
         Balanced octree set
     """
-    return  remove_overlaps(balance_helper(tree, depth), depth)
+    return  remove_overlaps(balance_subroutine(tree, depth), depth)
 
 
 def assign_points_to_keys(points, tree, x0, r0):
