@@ -605,14 +605,14 @@ def find_ancestors(key):
     Find Morton key of all ancestors, including the key itself.
     """
     level = find_level(key)
-    key = key >> 15
+    key = key >> LEVEL_DISPLACEMENT
 
     ancestors = np.zeros(shape=(level+1), dtype=np.int64)
     idx = 0
 
     while level > -1:
 
-        ancestors[idx] = ((key) << 15) | level
+        ancestors[idx] = ((key) << LEVEL_DISPLACEMENT) | level
         key = key >> 3
         idx += 1
         level -= 1

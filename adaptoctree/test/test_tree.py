@@ -39,7 +39,6 @@ def balanced(unbalanced):
     return np.fromiter(tmp, np.int64, len(tmp))
 
 
-
 @pytest.fixture
 def octree_center(points):
     min_bound, max_bound = morton.find_bounds(points)
