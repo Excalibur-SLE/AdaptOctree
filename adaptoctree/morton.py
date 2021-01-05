@@ -464,6 +464,28 @@ def find_descendents(key, N):
 
 
 @numba.njit(
+    [types.Keys(types.Key, types.Long)],
+    cache=True
+)
+def find_all_descendents(key, N):
+    """
+    Find all descendents between current level, and N levels down from key.
+    """
+    descendents = find_children(key)
+
+    previous_left_idx = 0
+
+    for i in range(N - 1):
+        left_idx = previous_left_idx
+        right_idx = 8 ** (i + 1) + left_idx
+        for d in descendents[left_idx:right_idx]:
+            descendents = np.hstack((descendents, find_children(d)))
+
+        previous_left_idx = right_idx
+
+    return descendents
+
+@numba.njit(
     [types.Key(types.Key)],
     cache=True
 )

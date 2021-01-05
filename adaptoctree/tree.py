@@ -135,56 +135,19 @@ def build(points, max_level, max_points, start_level):
     cache=True
 )
 def remove_overlaps(tree, depth):
-    """
-    Perform BFS, for each node in the linear octree, and remove if
-        it overlaps with any present descendents in the tree.
-    """
-
-    def bfs(root, tree, depth):
-        """
-        Perform breadth-first search starting from a given root, to find
-            children in the tree that it overlaps with.
-
-        Parameters:
-        -----------
-        root : np.int64
-            Root of BFS.
-        tree : {np.int64}
-            Linear octree.
-        depth : np.int64
-            Maximum depth of octree.
-
-        Returns:
-        --------
-        {np.int64}
-            Set of overlapping children, if they exist.
-        """
-        queue = [root]
-
-        overlaps = set()
-
-        while queue:
-            for node in queue:
-                level = morton.find_level(node)
-                new_queue = []
-                for l in range(1, depth-level + 1):
-
-                    descs = morton.find_descendents(node, l)
-                    ints = set(descs).intersection(tree)
-
-                    overlaps.update(ints)
-
-                    new_queue.extend(list(ints))
-
-            queue = new_queue
-
-        return overlaps
 
     unique = set(tree)
 
-    for node in tree:
-        if bfs(node, unique, depth):
-            unique.remove(node)
+    for l in range(depth, 0, -1):
+        # nodes at current level
+        Q = [x for x in tree if morton.find_level(x) == l]
+
+        for q in Q:
+            ancestors = morton.find_ancestors(q)
+            ancestors.remove(q)
+            for a in ancestors:
+                if a in unique:
+                    unique.remove(a)
 
     return unique
 
@@ -212,6 +175,7 @@ def balance_helper(tree, depth):
                 parent_level = l-1
 
                 if ~(n in balanced) and ~(parent in balanced):
+
                     balanced.add(parent)
 
                     if parent_level > 0:
