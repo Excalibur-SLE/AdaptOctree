@@ -135,21 +135,27 @@ def build(points, max_level, max_points, start_level):
     cache=True
 )
 def remove_overlaps(tree, depth):
+    """
+    Remove the overlaps in a balanced octree.
+        Strategy: Traverse the octree level by level, bottum-up, and check if
+        any ancestors lie in the tree. If they do, then remove them.
+    """
 
-    unique = set(tree)
+    result = set(tree)
 
-    for l in range(depth, 0, -1):
+    for level in range(depth, 0, -1):
+
         # nodes at current level
-        Q = [x for x in tree if morton.find_level(x) == l]
+        work_items = [x for x in tree if morton.find_level(x) == level]
 
-        for q in Q:
-            ancestors = morton.find_ancestors(q)
-            ancestors.remove(q)
-            for a in ancestors:
-                if a in unique:
-                    unique.remove(a)
+        for work_item in work_items:
+            ancestors = morton.find_ancestors(work_item)
+            ancestors.remove(work_item)
+            for ancestor in ancestors:
+                if ancestor in result:
+                    result.remove(ancestor)
 
-    return unique
+    return result
 
 
 @numba.njit(
@@ -160,19 +166,22 @@ def balance_helper(tree, depth):
     """
     Perform balancing to enforece the 2:1 constraint between neighbouring
         nodes in linear octree.
+        Strategy: Traverse the octree level by level, bottom-up, and check if
+        the parent's of a given node's parent lie in the tree, add them and their
+        respective siblings. This enforces the 2:1 constraint.
     """
     balanced = set(tree)
 
-    for l in range(depth, 0, -1):
+    for level in range(depth, 0, -1):
         # nodes at current level
-        Q = [x for x in balanced if morton.find_level(x) == l]
+        work_items = [x for x in balanced if morton.find_level(x) == level]
 
-        for q in Q:
-            neighbours = morton.find_neighbours(q)
+        for work_item in work_items:
+            neighbours = morton.find_neighbours(work_item)
 
             for n in neighbours:
                 parent = morton.find_parent(n)
-                parent_level = l-1
+                parent_level = level-1
 
                 if ~(n in balanced) and ~(parent in balanced):
 
