@@ -72,8 +72,8 @@ def find_center_from_anchor(anchor, x0, r0):
     level = anchor[3]
     side_length = 2 * r0 / (1 << level)
 
-    side_length = np.float32(side_length)
-    anchor = anchor.astype(np.float32)
+    side_length = np.float64(side_length)
+    anchor = anchor.astype(np.float64)
 
     return (anchor[:3] + 0.5) * side_length + xmin
 
