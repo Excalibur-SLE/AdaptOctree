@@ -229,7 +229,8 @@ def points_to_keys(points, tree, depth, x0, r0):
         ancestors = morton.find_ancestors(key)
 
         ints = ancestors.intersection(tree_set)
-        leaves[i] = next(iter(ints))
+        if ints:
+            leaves[i] = next(iter(ints))
 
     return leaves
 
