@@ -138,7 +138,7 @@ def remove_overlaps(tree, depth):
     """
     Remove the overlaps in a balanced octree.
 
-        Strategy: Traverse the octree level by level, bottum-up, and check if
+        Strategy: Traverse the octree level by level, bottom-up, and check if
         any ancestors lie in the tree. If they do, then remove them.
     """
 
@@ -204,37 +204,32 @@ def balance(tree, depth):
 
     Returns:
     --------
-    {np.int64}
-        Balanced octree set
+    np.array(np.int64)
+        Balanced octree
     """
-    return  remove_overlaps(balance_subroutine(tree, depth), depth)
+    tmp = remove_overlaps(balance_subroutine(tree, depth), depth)
+    return np.fromiter(tmp, np.int64)
 
 
-def assign_points_to_keys(points, tree, x0, r0):
+@numba.njit(
+    [types.Keys(types.Coords, types.Keys, types.Long, types.Coord, types.Double)],
+    cache=True
+)
+def points_to_keys(points, tree, depth, x0, r0):
     """
     Assign particle positions to Morton keys in a given tree.
-    Parameters:
-    -----------
-    points : np.array(shape=(N, 3), dtype=np.float32)
-    tree : Octree
-    Returns:
-    --------
-    np.array(shape=(N,), dtype=np.int64)
-        Column vector specifying the Morton key of the node that each point is
-        associated with.
     """
-    # Map Morton key to bounds that they represent.
     n_points = points.shape[0]
     leaves = -1*np.ones(n_points, dtype=np.int64)
+    tree_set = set(tree)
 
-    # Loop over points, and assign to a node from the tree by examining the bounds
-    depth = find_depth(tree)
+    keys = morton.encode_points_smt(points, depth, x0, r0)
 
-    for i, point in enumerate(points):
-        for level in range(1, depth+1):
-            key = morton.encode_point(point, level, x0, r0)
-            if key in tree:
-                leaves[i] = key
+    for i, key in enumerate(keys):
+        ancestors = morton.find_ancestors(key)
+
+        ints = ancestors.intersection(tree_set)
+        leaves[i] = next(iter(ints))
 
     return leaves
 
