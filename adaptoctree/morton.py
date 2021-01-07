@@ -152,7 +152,7 @@ def find_radius(center, max_bound, min_bound):
     rad2 = np.max(max_bound - center)
     vals = np.array([rad1, rad2])
     radius = np.max(vals) * (1 + 1e-10)
-    return radius
+    return abs(radius)
 
 
 @numba.njit(

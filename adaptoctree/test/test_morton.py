@@ -14,10 +14,10 @@ import adaptoctree.morton as morton
     "anchor, x0, r0, expected",
     [
         (
-            np.array([1, 1 , 1, 1], dtype=np.int32),
-            np.array([0, 0, 0], dtype=np.float32),
+            np.array([1, 1 , 1, 1], dtype=np.int64),
+            np.array([0, 0, 0], dtype=np.float64),
             np.float32(2),
-            np.array([1, 1, 1], dtype=np.float32)
+            np.array([1, 1, 1], dtype=np.float64)
         )
     ]
 )
@@ -25,7 +25,7 @@ def test_find_center_from_anchor(anchor, x0, r0, expected):
 
     result = morton.find_center_from_anchor(anchor, x0, r0)
     assert np.array_equal(result, expected)
-    assert isinstance(result[0], np.float32)
+    assert isinstance(result[0], np.float64)
 
 
 @pytest.mark.parametrize(
@@ -33,9 +33,9 @@ def test_find_center_from_anchor(anchor, x0, r0, expected):
     [
         (
             np.int64(0),
-            np.array([1, 1, 1], dtype=np.float32),
+            np.array([1, 1, 1], dtype=np.float64),
             np.float32(2),
-            np.array([1, 1, 1], dtype=np.float32)
+            np.array([1, 1, 1], dtype=np.float64)
         )
     ]
 )

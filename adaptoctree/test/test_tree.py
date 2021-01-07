@@ -42,7 +42,7 @@ def balanced(unbalanced):
 @pytest.fixture
 def octree_center(points):
     min_bound, max_bound = morton.find_bounds(points)
-    return morton.find_center(min_bound, max_bound)
+    return morton.find_center(max_bound, min_bound)
 
 
 @pytest.fixture
@@ -51,39 +51,30 @@ def octree_radius(octree_center, points):
     return morton.find_radius(octree_center, max_bound, min_bound)
 
 
-def test_particle_constraint(
-    unbalanced, balanced, max_points, points, octree_center, octree_radius
-):
+@pytest.fixture
+def assigned_unbalanced(unbalanced, points, octree_center, octree_radius):
+    depth = tree.find_depth(unbalanced)
+    return tree.points_to_keys(points, unbalanced, depth, octree_center, octree_radius)
+
+
+@pytest.fixture
+def assigned_balanced(balanced, points, octree_center, octree_radius):
+    depth = tree.find_depth(balanced)
+    return tree.points_to_keys(points, balanced, depth, octree_center, octree_radius)
+
+
+def test_particle_constraint(max_points, assigned_unbalanced, assigned_balanced):
     """
     Test that the number of particles in a leaf box doesn't exceed the user
         specified constraint for both the balanced and unbalanced trees.
     """
 
-    assigned_unbalanced = tree.assign_points_to_keys(
-        points, unbalanced, octree_center, octree_radius
-        )
     _, counts_unbalanced = np.unique(assigned_unbalanced, return_counts=True)
-
-    assigned_balanced = tree.assign_points_to_keys(
-        points, balanced, octree_center, octree_radius
-        )
 
     _, counts_balanced = np.unique(assigned_balanced, return_counts=True)
 
     assert np.all(counts_unbalanced <= max_points)
     assert np.all(counts_balanced <= max_points)
-
-
-def test_balance_constraint(balanced, octree_center, octree_radius):
-    """
-    Test that the 2:1 balance constraint is satisfied
-    """
-
-    for i in balanced:
-        for j in balanced:
-            if (i != j) and morton.are_neighbours(i, j, octree_center, octree_radius):
-                diff = abs(morton.find_level(i) - morton.find_level(j))
-                assert diff <= 1
 
 
 def test_no_overlaps(balanced):
