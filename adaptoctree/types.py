@@ -4,6 +4,7 @@ Type aliases.
 import numba
 
 
+Bool = numba.boolean
 Key = numba.int64
 Keys = numba.int64[:]
 KeySet = numba.types.Set(Key)

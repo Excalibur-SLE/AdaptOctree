@@ -66,7 +66,23 @@ def find_v(key, tree):
 
 
 def find_w(key, tree):
-    pass
+    """
+    Defined for all leaf octants, as all octants which  are descendents of
+        colleagues of the node, are not adjacent to the node themselves, but
+        their parents are adjacent to the node.
+    """
+
+    #1. Find colleagues
+    neighbours = morton.find_neighbours(key)
+    colleagues = -1*np.ones_like(neighbours)
+    w = -1*np.ones(shape=(32,), dtype=np.int64)
+
+    n_colleagues = 0
+    for i, neighbour in enumerate(neighbours):
+        if neighbour in tree:
+            colleagues[i] = neighbour
+            n_colleagues += 1
+
 
 
 def find_x(key, tree):

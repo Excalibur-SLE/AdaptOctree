@@ -794,10 +794,17 @@ def find_node_bounds(key, x0, r0):
     return lower_bound, upper_bound
 
 
-@numba.njit
+@numba.njit(
+    [types.Bool(types.Key, types.Key)],
+    cache=True
+)
 def are_adjacent(a, b):
     """
     Check if two keys are adjacent.
+
+    Strategy: if a == b then they aren't adjacent. Otherwise, find the smaller
+        node, and check whether any of it's neighbours' ancestors are b. If
+        they are then a is adjacent to b.
     """
     if a == b:
         return False
