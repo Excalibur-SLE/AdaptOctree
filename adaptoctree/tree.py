@@ -248,6 +248,34 @@ def find_depth(tree):
 
 
 
+
+def populate_leaves(points, leaves):
+    """
+    Populate leaves with their interaction lists.
+    """
+    return 1
+
+
+def populate_tree(leaves):
+    """
+    Populate whole tree with interaction lists, from the leaves.
+    """
+    return 1
+
+
+class Node:
+    """
+    API for tree node.
+    """
+    def __init__(self, key, particles, u, v, w, x):
+        self.key = key
+        self.particles = particles
+        self.u = u
+        self.v = v
+        self.w = w
+        self.x = x
+
+
 class Tree:
     """
     API for tree.
@@ -256,16 +284,8 @@ class Tree:
         self.particles = points
         _unbalanced = build(points, max_level, max_points, start_level)
         self.depth = find_depth(_unbalanced)
-        leaves = balance(_unbalanced, self.depth)
+        balanced = balance(_unbalanced, self.depth)
 
         # Leaves populated before this attribute assignment
-        self.leaves = {
-            l: {'x': None, 'v': None, 'y': None, 'z': None, 'particles': None}
-            for l in leaves
-            }
-
-
-
-
-
-
+        leaves = populate_leaves(points, balanced)
+        self.tree = populate_tree(leaves)

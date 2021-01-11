@@ -6,7 +6,7 @@ adaptive tree?
 """
 
 
-def find_x(key, tree):
+def find_u(key, tree):
     pass
 
 
@@ -18,5 +18,5 @@ def find_w(key, tree):
     pass
 
 
-def find_z(key, tree):
+def find_x(key, tree):
     pass
