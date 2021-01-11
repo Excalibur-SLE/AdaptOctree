@@ -792,3 +792,24 @@ def find_node_bounds(key, x0, r0):
     upper_bound = center + displacement
 
     return lower_bound, upper_bound
+
+
+@numba.njit
+def are_adjacent(a, b):
+    """
+    Check if two keys are adjacent.
+    """
+    if a == b:
+        return False
+
+    level_a = find_level(a)
+    level_b = find_level(b)
+
+    smaller = a if (level_a <= level_b) else b
+    neighbours = find_neighbours(smaller)
+
+    for n in neighbours:
+        ancestors = find_ancestors(n)
+        if b in ancestors:
+            return True
+    return False

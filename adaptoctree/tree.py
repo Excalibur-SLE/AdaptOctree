@@ -204,11 +204,10 @@ def balance(tree, depth):
 
     Returns:
     --------
-    np.array(np.int64)
+    {np.int64}
         Balanced octree
     """
-    tmp = remove_overlaps(balance_subroutine(tree, depth), depth)
-    return np.fromiter(tmp, np.int64)
+    return remove_overlaps(balance_subroutine(tree, depth), depth)
 
 
 @numba.njit(
@@ -282,8 +281,9 @@ class Tree:
         self.particles = points
         _unbalanced = build(points, max_level, max_points, start_level)
         self.depth = find_depth(_unbalanced)
-        balanced = balance(_unbalanced, self.depth)
+        balanced_set = balance(_unbalanced, self.depth)
+        balanced_arr = np.fromiter(balanced_set, np.int64)
 
         # Leaves populated before this attribute assignment
-        leaves = populate_leaves(points, balanced)
+        leaves = populate_leaves(points, balanced_set)
         self.tree = populate_tree(leaves)
