@@ -245,3 +245,27 @@ def find_depth(tree):
     """
     levels = morton.find_level(np.unique(tree))
     return np.max(levels)
+
+
+
+class Tree:
+    """
+    API for tree.
+    """
+    def __init__(self, points, max_level, max_points, start_level):
+        self.particles = points
+        _unbalanced = build(points, max_level, max_points, start_level)
+        self.depth = find_depth(_unbalanced)
+        leaves = balance(_unbalanced, self.depth)
+
+        # Leaves populated before this attribute assignment
+        self.leaves = {
+            l: {'x': None, 'v': None, 'y': None, 'z': None, 'particles': None}
+            for l in leaves
+            }
+
+
+
+
+
+
