@@ -247,8 +247,6 @@ def find_depth(tree):
     return np.max(levels)
 
 
-
-
 def populate_leaves(points, leaves):
     """
     Populate leaves with their interaction lists.
@@ -278,7 +276,7 @@ class Node:
 
 class Tree:
     """
-    API for tree.
+    API for tree, for use with PyExaFMM.
     """
     def __init__(self, points, max_level, max_points, start_level):
         self.particles = points
