@@ -55,11 +55,10 @@ def find_v(key, complete_tree):
     parent_neighbours = morton.find_neighbours(parent)
 
     for neighbour in parent_neighbours:
-        if neighbour in complete_tree:
-            neighbour_children = morton.find_children(neighbour)
-            for child in neighbour_children:
-                if child in complete_tree and not morton.are_adjacent(child, key):
-                    v.append(child)
+        neighbour_children = morton.find_children(neighbour)
+        for child in neighbour_children:
+            if child in complete_tree and not morton.are_adjacent(child, key):
+                v.append(child)
 
     return np.array(v, dtype=np.int64)
 
@@ -84,18 +83,3 @@ def find_w(key, leaves):
                 w.append(child)
 
     return np.array(w, dtype=np.int64)
-
-
-def find_x(key, leaves, tree):
-    """
-    Defined for all leaves, for B consists of all octants A which have B on their
-    W list.
-    """
-
-    x = []
-
-    for leaf in leaves:
-        if key in tree[leaf].w:
-            x.append(key)
-
-    return np.array(x, dtype=np.int64)

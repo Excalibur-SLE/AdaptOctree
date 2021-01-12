@@ -263,7 +263,7 @@ def complete_tree(balanced):
     return complete
 
 
-def populate_leaves(points, complete_tree_set, leaves_set, leaves_arr, depth, x0, r0):
+def populate_leaves(points, points_to_leaves, complete_tree_set, leaves_set, leaves_arr, depth, x0, r0):
     """
     Populate leaves with their interaction lists and corresponding points.
 
@@ -272,26 +272,58 @@ def populate_leaves(points, complete_tree_set, leaves_set, leaves_arr, depth, x0
     points : np.array(shape=(N, 3))
     leaves : {np.int64}
     """
-    points_to_leaves = points_to_keys(points, leaves_arr, depth, x0, r0)
     pop = dict()
+
+    x_tmp = {leaf:None for leaf in leaves_arr}
+
     for leaf in leaves_arr:
         points_subset = points[points_to_leaves == leaf]
+
         u = interactions.find_u(leaf, leaves_set)
         v = interactions.find_v(leaf, complete_tree_set)
         w = interactions.find_w(leaf, leaves_set)
-        pop[leaf] = Node(leaf points=points_subset, u=u, v=v, w=w, x=None)
+        pop[leaf] = Node(key=leaf, points=points_subset, u=u, v=v, w=w, x=None)
 
-    for leaf in leaves_arr:
-        pop[leaf].x = interactions.find_x(leaf, leaves_set, pop)
+        # x list defined through inversion of w list
+        for item in w:
+            if x_tmp[item] is not None:
+                x_tmp[item] = np.hstack((x_tmp[item], w))
+            else:
+                x_tmp[item] = w
+
+    for leaf, x_list in x_tmp.items():
+        pop[leaf].x = x_list
 
     return pop
 
 
-def populate_tree(leaves):
+def populate_tree(populated_leaves, complete_tree_set, depth):
     """
     Populate whole tree with interaction lists, from the leaves.
     """
-    return 1
+    pop = {level: dict() for level in range(0, depth+1)}
+
+    for leaf, node in populated_leaves.items():
+        level = morton.find_level(leaf)
+        pop[level][leaf] = node
+        parent = morton.find_parent(leaf)
+        parent_level = morton.find_level(parent)
+        while parent > -1:
+            v = interactions.find_v(parent, complete_tree_set)
+            leaf_points = node.points
+
+            if parent not in pop[parent_level]:
+                pop[parent_level][parent] = Node(
+                    u=None, w=None, v=v, x=None, key=parent, points=leaf_points)
+            else:
+                parent_points = pop[parent_level][parent].points
+                points = np.vstack((leaf_points, parent_points))
+                pop[parent_level][parent].points = points
+
+            parent = morton.find_parent(parent)
+            parent_level = morton.find_level(parent)
+
+    return pop
 
 
 class Node:
@@ -306,6 +338,9 @@ class Node:
         self.w = w
         self.x = x
 
+    def __repr__(self):
+        return f"<Node key={self.key}>"
+
 
 class Tree:
     """
@@ -316,26 +351,40 @@ class Tree:
         _unbalanced = build(points, max_level, max_points, start_level)
         self.depth = find_depth(_unbalanced)
 
-        max_bound, min_bound = morton.find_bounds(particles)
+        max_bound, min_bound = morton.find_bounds(points)
         self.center= morton.find_center(max_bound, min_bound)
         self.radius = morton.find_radius(self.center, max_bound, min_bound)
 
         balanced_set = balance(_unbalanced, self.depth)
         balanced_arr = np.fromiter(balanced_set, np.int64)
-        complete_tree_set = complete_tree(balanced_arr)
+        points_to_leaves = points_to_keys(
+            points, balanced_arr,
+            self.depth,
+            self.center,
+            self.radius
+            )
+        non_empty_balanced_arr = np.unique(points_to_leaves)
+        non_empty_balanced_set = set(non_empty_balanced_arr)
+        complete_tree_set = complete_tree(non_empty_balanced_arr)
 
         # Leaves populated before this attribute assignment
-        leaves = populate_leaves(
+        populated_leaves = populate_leaves(
             points,
+            points_to_leaves,
             complete_tree_set,
-            balanced_set,
-            balanced_arr,
+            non_empty_balanced_set,
+            non_empty_balanced_arr,
             self.depth,
             self.center,
             self.radius
             )
 
-        self.tree = populate_tree(leaves)
+        self.tree = populate_tree(
+            populated_leaves,
+            complete_tree_set,
+            self.depth
+            )
 
-    def __getitem__(self, key):
-        return self.tree[key]
+    def __getitem__(self, level):
+        """Read only"""
+        return self.tree[level]
