@@ -7,6 +7,7 @@ import numpy as np
 
 import adaptoctree.morton as morton
 import adaptoctree.types as types
+import adaptoctree.interactions as interactions
 
 
 @numba.njit(
@@ -246,11 +247,44 @@ def find_depth(tree):
     return np.max(levels)
 
 
-def populate_leaves(points, leaves):
+@numba.njit(
+    [types.KeySet(types.KeyArray)],
+    cache=True
+)
+def complete_tree(balanced):
     """
-    Populate leaves with their interaction lists.
+    Take a balanced tree, and complete it - adding all of its ancestors.
     """
-    return 1
+    complete = set(balanced)
+
+    for key in balanced:
+        complete.update(morton.find_ancestors(key))
+
+    return complete
+
+
+def populate_leaves(points, complete_tree_set, leaves_set, leaves_arr, depth, x0, r0):
+    """
+    Populate leaves with their interaction lists and corresponding points.
+
+    Parameters:
+    -----------
+    points : np.array(shape=(N, 3))
+    leaves : {np.int64}
+    """
+    points_to_leaves = points_to_keys(points, leaves_arr, depth, x0, r0)
+    pop = dict()
+    for leaf in leaves_arr:
+        points_subset = points[points_to_leaves == leaf]
+        u = interactions.find_u(leaf, leaves_set)
+        v = interactions.find_v(leaf, complete_tree_set)
+        w = interactions.find_w(leaf, leaves_set)
+        pop[leaf] = Node(leaf points=points_subset, u=u, v=v, w=w, x=None)
+
+    for leaf in leaves_arr:
+        pop[leaf].x = interactions.find_x(leaf, leaves_set, pop)
+
+    return pop
 
 
 def populate_tree(leaves):
@@ -264,9 +298,9 @@ class Node:
     """
     API for tree node.
     """
-    def __init__(self, key, particles, u, v, w, x):
+    def __init__(self, key, points, u, v, w, x):
         self.key = key
-        self.particles = particles
+        self.points = points
         self.u = u
         self.v = v
         self.w = w
@@ -281,9 +315,27 @@ class Tree:
         self.particles = points
         _unbalanced = build(points, max_level, max_points, start_level)
         self.depth = find_depth(_unbalanced)
+
+        max_bound, min_bound = morton.find_bounds(particles)
+        self.center= morton.find_center(max_bound, min_bound)
+        self.radius = morton.find_radius(self.center, max_bound, min_bound)
+
         balanced_set = balance(_unbalanced, self.depth)
         balanced_arr = np.fromiter(balanced_set, np.int64)
+        complete_tree_set = complete_tree(balanced_arr)
 
         # Leaves populated before this attribute assignment
-        leaves = populate_leaves(points, balanced_set)
+        leaves = populate_leaves(
+            points,
+            complete_tree_set,
+            balanced_set,
+            balanced_arr,
+            self.depth,
+            self.center,
+            self.radius
+            )
+
         self.tree = populate_tree(leaves)
+
+    def __getitem__(self, key):
+        return self.tree[key]

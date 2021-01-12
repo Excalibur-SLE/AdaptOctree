@@ -803,8 +803,8 @@ def are_adjacent(a, b):
     Check if two keys are adjacent.
 
     Strategy: if a == b then they aren't adjacent. Otherwise, find the smaller
-        node, and check whether any of it's neighbours' ancestors are b. If
-        they are then a is adjacent to b.
+        node, and check whether any of it's neighbours' ancestors are in the
+        larger node. If they are then a is adjacent to b.
     """
     if a == b:
         return False
@@ -812,11 +812,21 @@ def are_adjacent(a, b):
     level_a = find_level(a)
     level_b = find_level(b)
 
-    smaller = a if (level_a <= level_b) else b
+    if level_a > level_b:
+        smaller = a
+        larger = b
+    else:
+        smaller = b
+        larger = a
+
+    if larger in find_ancestors(smaller):
+        return False
+
     neighbours = find_neighbours(smaller)
 
     for n in neighbours:
         ancestors = find_ancestors(n)
-        if b in ancestors:
+        if larger in ancestors:
             return True
+
     return False
