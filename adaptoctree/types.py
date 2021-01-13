@@ -9,7 +9,6 @@ Key = numba.int64
 Keys = numba.int64[:]
 KeySet = numba.types.Set(Key)
 KeyList = numba.types.ListType(Key)
-KeyArray = numba.int64[:]
 Anchor = numba.int64[:]
 Anchors = numba.int64[:]
 Single = numba.float32

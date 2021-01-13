@@ -248,7 +248,7 @@ def find_depth(tree):
 
 
 @numba.njit(
-    [types.KeySet(types.KeyArray)],
+    [types.KeySet(types.Keys)],
     cache=True
 )
 def complete_tree(balanced):
@@ -263,18 +263,44 @@ def complete_tree(balanced):
     return complete
 
 
-def populate_leaves(points, points_to_leaves, complete_tree_set, leaves_set, leaves_arr, depth, x0, r0):
+def populate_leaves(points, points_to_leaves, complete_tree_set,
+                    leaves_set, leaves_arr, depth, x0, r0):
     """
-    Populate leaves with their interaction lists and corresponding points.
+    Populate a data structure encapsulating each leaf key, the coordinates of
+        the points contained within them, and their interaction lists: U, V, W
+        and X. The X list is an inversion of the mapping contained in the W
+        list, and is therefore computed on the fly from the results of the W
+        list computation.
 
     Parameters:
     -----------
     points : np.array(shape=(N, 3))
-    leaves : {np.int64}
+        Coordinates of all N points.
+    points_to_leaves : np.array(shape=(N,))
+        Morton key corresponding to each point.
+    complete_tree_set : {np.int64}
+        Morton keys of all nodes in tree.
+    leaves_set : {np.int64}
+        Morton keys of all leaf nodes.
+    leaves_arr : np.array(dtype=np.int64)
+        Morton keys of all leaf nodes.
+    depth : np.int64
+        Depth of the valanced tree.
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of root node of Octree.
+    r0 : np.float64
+        Half side length of root node
+
+    Returns:
+    --------
+    dict(np.int64, Node)
+        Dictionary of leaf nodes, keys corresponding to leaf Morton keys, and
+        values to Node objects.
     """
     pop = dict()
 
-    x_tmp = {leaf:None for leaf in leaves_arr}
+    # Temporary structure to store X lists
+    x_tmp = {leaf:set() for leaf in leaves_arr}
 
     for leaf in leaves_arr:
         points_subset = points[points_to_leaves == leaf]
@@ -284,13 +310,14 @@ def populate_leaves(points, points_to_leaves, complete_tree_set, leaves_set, lea
         w = interactions.find_w(leaf, leaves_set)
         pop[leaf] = Node(key=leaf, points=points_subset, u=u, v=v, w=w, x=None)
 
-        # x list defined through inversion of w list
-        for item in w:
-            if x_tmp[item] is not None:
-                x_tmp[item] = np.hstack((x_tmp[item], w))
+        # Update X list
+        for key in w:
+            if x_tmp[key] is not None:
+                x_tmp[key].update(w)
             else:
-                x_tmp[item] = w
+                x_tmp[key].add(w)
 
+    # Store X list
     for leaf, x_list in x_tmp.items():
         pop[leaf].x = x_list
 
