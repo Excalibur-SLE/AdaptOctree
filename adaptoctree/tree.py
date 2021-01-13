@@ -263,8 +263,9 @@ def complete_tree(balanced):
     return complete
 
 
-def populate_leaves(points, points_to_leaves, complete_tree_set,
-                    leaves_set, leaves_arr, depth, x0, r0):
+def populate_leaves(
+        points, points_to_leaves, leaves_arr,  depth, x0, r0
+    ):
     """
     Populate a data structure encapsulating each leaf key, the coordinates of
         the points contained within them, and their interaction lists: U, V, W
@@ -278,14 +279,10 @@ def populate_leaves(points, points_to_leaves, complete_tree_set,
         Coordinates of all N points.
     points_to_leaves : np.array(shape=(N,))
         Morton key corresponding to each point.
-    complete_tree_set : {np.int64}
-        Morton keys of all nodes in tree.
-    leaves_set : {np.int64}
-        Morton keys of all leaf nodes.
     leaves_arr : np.array(dtype=np.int64)
         Morton keys of all leaf nodes.
     depth : np.int64
-        Depth of the valanced tree.
+        Depth of the balanced tree.
     x0 : np.array(shape=(3,), dtype=np.float64)
         Center of root node of Octree.
     r0 : np.float64
@@ -305,113 +302,138 @@ def populate_leaves(points, points_to_leaves, complete_tree_set,
     for leaf in leaves_arr:
         points_subset = points[points_to_leaves == leaf]
 
-        u = interactions.find_u(leaf, leaves_set)
-        v = interactions.find_v(leaf, complete_tree_set)
-        w = interactions.find_w(leaf, leaves_set)
-        pop[leaf] = Node(key=leaf, points=points_subset, u=u, v=v, w=w, x=None)
+        u = interactions.find_u(leaf, leaves_arr, x0, r0)
+        v = interactions.find_v(leaf, leaves_arr, x0, r0)
+        w = interactions.find_w(leaf, leaves_arr, x0, r0)
+
+        pop[leaf] = {
+            'key':leaf,
+            'points': points_subset,
+            'u': u,
+            'v':v,
+            'w':w
+        }
 
         # Update X list
         for key in w:
-            if x_tmp[key] is not None:
-                x_tmp[key].update(w)
-            else:
-                x_tmp[key].add(w)
+            x_tmp[key].update(w)
 
-    # Store X list
+    # Store X list in Node
     for leaf, x_list in x_tmp.items():
-        pop[leaf].x = x_list
+        pop[leaf]['x'] = x_list
 
     return pop
 
 
-def populate_tree(populated_leaves, complete_tree_set, depth):
+def populate_tree(populated_leaves, complete_tree_arr, depth, x0, r0):
     """
-    Populate whole tree with interaction lists, from the leaves.
+    Populate a data structure encaspulating all nodes in a tree, the coordinates
+        of the points contained within them, and their interaction lists: U, V,
+        W and X.
+
+    Parameters:
+    -----------
+    populated_leaves : dict(np.int64, Node)
+        Output of populate_leaves function.
+    complete_tree_arr : np.array(dtype=np.int64)
+        Morton keys of all nodes in tree.
+    depth : np.int64
+        Depth of the balanced tree.
+
+    Returns:
+    --------
+    dict(np.int64, dict(np.int64, Node))
+        Nested dictionary, outer key corresponds to tree level, inner key
+        corresponds to the Morton key of the node.
     """
     pop = {level: dict() for level in range(0, depth+1)}
 
-    for leaf, node in populated_leaves.items():
-        level = morton.find_level(leaf)
-        pop[level][leaf] = node
-        parent = morton.find_parent(leaf)
-        parent_level = morton.find_level(parent)
-        while parent > -1:
-            v = interactions.find_v(parent, complete_tree_set)
-            leaf_points = node.points
+    for leaf_key, leaf_node in populated_leaves.items():
 
-            if parent not in pop[parent_level]:
-                pop[parent_level][parent] = Node(
-                    u=None, w=None, v=v, x=None, key=parent, points=leaf_points)
+        leaf_level = morton.find_level(leaf_key)
+        pop[leaf_level][leaf_key] = leaf_node
+
+        parent_key = morton.find_parent(leaf_key)
+        parent_level = morton.find_level(parent_key)
+
+        while True:
+
+            leaf_points = leaf_node['points']
+
+            if parent_key not in pop[parent_level]:
+                v = interactions.find_v(parent_key, complete_tree_arr, x0, r0)
+                pop[parent_level][parent_key] = {
+                    'u': None,
+                    'v': v,
+                    'w': None,
+                    'x': None,
+                    'key': parent_key,
+                    'points': leaf_points
+                }
+
             else:
-                parent_points = pop[parent_level][parent].points
+                parent_points = pop[parent_level][parent_key]['points']
                 points = np.vstack((leaf_points, parent_points))
-                pop[parent_level][parent].points = points
+                pop[parent_level][parent_key]['points'] = points
 
-            parent = morton.find_parent(parent)
-            parent_level = morton.find_level(parent)
+            if parent_key == 0:
+                break
+
+            parent_key = morton.find_parent(parent_key)
+            parent_level = morton.find_level(parent_key)
 
     return pop
-
-
-class Node:
-    """
-    API for tree node.
-    """
-    def __init__(self, key, points, u, v, w, x):
-        self.key = key
-        self.points = points
-        self.u = u
-        self.v = v
-        self.w = w
-        self.x = x
-
-    def __repr__(self):
-        return f"<Node key={self.key}>"
 
 
 class Tree:
     """
-    API for tree, for use with PyExaFMM.
+    API for tree, for use with PyExaFMM. Read only.
     """
     def __init__(self, points, max_level, max_points, start_level):
-        self.particles = points
-        _unbalanced = build(points, max_level, max_points, start_level)
-        self.depth = find_depth(_unbalanced)
+        self.points = points
+        self.n_points = len(points)
+        self.unbalanced = build(points, max_level, max_points, start_level)
+        self.unbalanced_depth = find_depth(self.unbalanced)
 
         max_bound, min_bound = morton.find_bounds(points)
         self.center= morton.find_center(max_bound, min_bound)
         self.radius = morton.find_radius(self.center, max_bound, min_bound)
 
-        balanced_set = balance(_unbalanced, self.depth)
+        balanced_set = balance(self.unbalanced, self.unbalanced_depth)
         balanced_arr = np.fromiter(balanced_set, np.int64)
+        self.depth = find_depth(balanced_arr)
         points_to_leaves = points_to_keys(
-            points, balanced_arr,
+            points,
+            balanced_arr,
             self.depth,
             self.center,
             self.radius
             )
         non_empty_balanced_arr = np.unique(points_to_leaves)
-        non_empty_balanced_set = set(non_empty_balanced_arr)
         complete_tree_set = complete_tree(non_empty_balanced_arr)
+        complete_tree_arr = np.fromiter(complete_tree_set, np.int64)
+        self.n_nodes = len(complete_tree_arr)
 
         # Leaves populated before this attribute assignment
         populated_leaves = populate_leaves(
-            points,
-            points_to_leaves,
-            complete_tree_set,
-            non_empty_balanced_set,
-            non_empty_balanced_arr,
-            self.depth,
-            self.center,
-            self.radius
+            points=points,
+            points_to_leaves=points_to_leaves,
+            leaves_arr=non_empty_balanced_arr,
+            depth=self.depth,
+            x0=self.center,
+            r0=self.radius
             )
 
         self.tree = populate_tree(
-            populated_leaves,
-            complete_tree_set,
-            self.depth
+            populated_leaves=populated_leaves,
+            complete_tree_arr=complete_tree_arr,
+            depth=self.depth,
+            x0=self.center,
+            r0=self.radius
             )
 
     def __getitem__(self, level):
-        """Read only"""
         return self.tree[level]
+
+    def __repr__(self):
+        return f"""<Tree depth={self.depth} n_points={self.n_points}  n_nodes={self.n_nodes}>"""

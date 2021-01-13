@@ -9,10 +9,10 @@ import adaptoctree.types as types
 
 
 @numba.njit(
-    [types.KeySet(types.Key, types.Keys)],
+    [types.KeySet(types.Key, types.Keys, types.Coord, types.Double)],
     cache=True
 )
-def find_u(key, leaves):
+def find_u(key, leaves, x0, r0):
     """
     U List. Defined for all leaves. For a leaf B, it consists of all leaves
         adjacent (share a vertex, face or side) to B, including B itself. In the
@@ -36,38 +36,33 @@ def find_u(key, leaves):
     parent_neighbours = morton.find_parent(neighbours)
 
     # 3. Find all adjacent neighbours of key at lower level
-    neighbour_children = None
+    neighbour_children = np.array([-1], dtype=np.int64)
     for neighbour in neighbours:
-        if neighbour_children is None:
-            neighbour_children = morton.find_children(neighbour)
-        else:
-            neighbour_children = np.hstack(
-                (neighbour_children, morton.find_children(neighbour))
-                )
+        neighbour_children = np.hstack((neighbour_children, morton.find_children(neighbour)))
 
-    all_neighbours = np.hstack(
-        (neighbours, parent_neighbours, neighbour_children)
-        )
+    neighbour_children = neighbour_children[1:]
+
+    all_neighbours = np.hstack((neighbours, parent_neighbours))
 
     for neighbour in all_neighbours:
-        if neighbour in leaves_set and morton.are_adjacent(neighbour, key):
-            u.add(neighbour)
+        if neighbour in leaves_set and morton.are_adjacent(neighbour, key, x0, r0):
+                u.add(neighbour)
 
     return u
 
 
 @numba.njit(
-    [types.KeySet(types.Key, types.Keys)],
+    [types.KeySet(types.Key, types.Keys, types.Coord, types.Double)],
     cache=True
 )
-def find_v(key, complete_tree):
+def find_v(key, complete_tree, x0, r0):
     """
     V List. Defined for all nodes in the tree. Colleagues are defined as
         adjacent octants at the same level. The V list consists of all children
         of the colleagues of the target octant B which are not adjacent to B.
     """
     v = set()
-    complete_tree = set(complete_tree)
+    complete_tree_set = set(complete_tree)
     parent = morton.find_parent(key)
 
     parent_neighbours = morton.find_neighbours(parent)
@@ -75,17 +70,17 @@ def find_v(key, complete_tree):
     for neighbour in parent_neighbours:
         neighbour_children = morton.find_children(neighbour)
         for child in neighbour_children:
-            if child in complete_tree and not morton.are_adjacent(child, key):
+            if child in complete_tree_set and not morton.are_adjacent(child, key, x0, r0):
                 v.add(child)
 
     return v
 
 
 @numba.njit(
-    [types.KeySet(types.Key, types.Keys)],
+    [types.KeySet(types.Key, types.Keys, types.Coord, types.Double)],
     cache=True
 )
-def find_w(key, leaves):
+def find_w(key, leaves, x0, r0):
     """
     W List. Defined for all leaves. For a leaf B, the leaf A is in its W list
         iff A is a descendent of a colleague of B, A is not adjacent to B,
@@ -101,12 +96,13 @@ def find_w(key, leaves):
     # 1. Find colleagues
     colleagues = morton.find_neighbours(key)
     w = set()
+    leaves_set = set(leaves)
 
     # 2. Find non-adjacent colleague-children
     for colleague in colleagues:
         children = morton.find_children(colleague)
         for child in children:
-            if child in leaves and not morton.are_adjacent(key, child):
+            if child in leaves_set and not morton.are_adjacent(key, child, x0, r0):
                 w.add(child)
 
     return w
