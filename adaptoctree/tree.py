@@ -245,3 +245,125 @@ def find_depth(tree):
     """
     levels = morton.find_level(np.unique(tree))
     return np.max(levels)
+
+
+@numba.njit
+def are_adjacent(a, b, depth):
+
+    def anchor_to_absolute(anchor, depth):
+        level = anchor[3]
+        level_diff = depth-level
+
+        if level_diff == 0:
+            return anchor[:3]
+
+        scaling_factor = 1 << level_diff
+        absolute = anchor[:3]*scaling_factor
+
+        return absolute
+
+    l_a = find_level(a)
+    l_b = find_level(b)
+
+    r_a = (1 << (depth-l_a))/2
+    r_b = (1 << (depth-l_b))/2
+
+    a = anchor_to_absolute(decode_key(a), depth)+r_a
+    b = anchor_to_absolute(decode_key(b), depth)+r_b
+
+    dist = np.abs(a-b)
+    norm = np.sqrt(np.sum(dist*dist))
+
+    if (r_a+r_b) <= norm <= np.sqrt(3)*(r_a+r_b):
+        return 1
+
+    return 0
+
+
+@numba.njit
+def adjacent_test(a, b):
+
+    if a in find_ancestors(b):
+        return 0
+
+    if b in find_ancestors(a):
+        return 0
+
+    la = find_level(a)
+    lb = find_level(b)
+
+    if la == lb:
+        if a not in find_neighbours(b):
+            return 0
+        else:
+            return 1
+
+    larger = a if la < lb else b
+    smaller = a if la > lb else a
+
+    neighbours = find_neighbours(smaller)
+
+    for n in neighbours:
+        ancestors = find_ancestors(n)
+        if larger in ancestors:
+            return 1
+    return 0
+
+
+@numba.njit
+def are_adjacent_vec(key, key_vec, depth):
+    result = np.zeros_like(key_vec)
+    for i, k in enumerate(key_vec):
+        result[i] = are_adjacent(key, k, depth)
+    return result
+
+
+@numba.njit(cache=True)
+def are_adjacent_vec_test(key, key_vec, depth):
+
+    result = np.zeros_like(key_vec)
+    for i, k in enumerate(key_vec):
+        result[i] = adjacent_test(key, k)
+    return result
+
+
+    @numba.njit(parallel=True, cache=True)
+def find_u_vec(leaves, depth):
+
+    def find_u(key, leaves, depth):
+
+        def find_all_neighbours(key):
+            # 1. Find all neighbours of leaf at same level in the tree
+            neighbours = find_neighbours(key)
+
+            # 2. Find all adjacent neighbours of key at higher level
+            parent_neighbours = find_parent(neighbours)
+
+            # 3. Find all adjacent neighbours of key at lower level
+            neighbour_children = find_children_vec(neighbours)
+            neighbour_children = neighbour_children.ravel()
+
+            all_neighbours = np.hstack((neighbours, parent_neighbours, neighbour_children))
+
+            return np.unique(all_neighbours)
+
+        all_neighbours = find_all_neighbours(key)
+
+        neighbours_in_tree = []
+        for n in all_neighbours:
+            if n in leaves:
+                neighbours_in_tree.append(n)
+
+        neighbours_in_tree = np.array(neighbours_in_tree)
+        uidxs = are_adjacent_vec_test(key, neighbours_in_tree, depth)
+
+        return neighbours_in_tree[uidxs==1]
+
+    result = np.zeros(shape=(len(leaves), 50), dtype=np.int64)
+    leaves_set = set(leaves)
+
+    for i in numba.prange(len(leaves)):
+        u =  find_u(leaves[i], leaves_set, depth)
+        result[i][0:len(u)] = u
+
+    return result
