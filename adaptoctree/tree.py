@@ -245,3 +245,48 @@ def find_depth(tree):
     """
     levels = morton.find_level(np.unique(tree))
     return np.max(levels)
+
+
+@numba.njit(
+    [types.LongArray2D(types.Keys, types.Long)],
+    parallel=True, cache=True
+)
+def find_interaction_lists(leaves, depth):
+    """Compute all interaction lists of leaf nodes"""
+
+    def find_u(key, leaves, depth):
+        def find_all_neighbours(key):
+            # 1. Find all neighbours of leaf at same level in the tree
+            neighbours = morton.find_neighbours(key)
+
+            # 2. Find all adjacent neighbours of key at higher level
+            parent_neighbours = morton.find_parent(neighbours)
+
+            # 3. Find all adjacent neighbours of key at lower level
+            neighbour_children = morton.find_children_vec(neighbours)
+            neighbour_children = neighbour_children.ravel()
+
+            all_neighbours = np.hstack((neighbours, parent_neighbours, neighbour_children))
+
+            return np.unique(all_neighbours)
+
+        all_neighbours = find_all_neighbours(key)
+
+        neighbours_in_tree = []
+        for n in all_neighbours:
+            if n in leaves:
+                neighbours_in_tree.append(n)
+
+        neighbours_in_tree = np.array(neighbours_in_tree)
+        uidxs = morton.are_adjacent_vec(key, neighbours_in_tree, depth)
+
+        return neighbours_in_tree[uidxs==1]
+
+    u = np.zeros(shape=(len(leaves), 50), dtype=np.int64)
+    leaves_set = set(leaves)
+
+    for i in numba.prange(len(leaves)):
+        u_tmp =  find_u(leaves[i], leaves_set, depth)
+        u[i][0:len(u_tmp)] = u_tmp
+
+    return u

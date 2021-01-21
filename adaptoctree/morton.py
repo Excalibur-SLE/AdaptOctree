@@ -441,6 +441,21 @@ def find_children(key):
 
 
 @numba.njit(
+    [types.LongArray2D(types.Keys)],
+    cache=True
+)
+def find_children_vec(keys):
+    """Find children of an array of keys"""
+    result = np.zeros(shape=(len(keys), 8), dtype=np.int64)
+
+    for i, key in enumerate(keys):
+        children = find_children(key)
+        result[i][0:8] = children
+
+    return result
+
+
+@numba.njit(
     [types.Keys(types.Key, types.Long)],
     cache=True
 )
@@ -769,7 +784,7 @@ def are_adjacent(a, b, tree_depth):
         position relative to the grid in which the finest box in the tree is.
         From this, create a bounding box around the centre of 'a' with a side
         length corresponding to the side length of 'a' and 'b' added together.
-        Then check whether the displacement of 'a' and 'b' lies within this box.
+        Then check whether the vector 'ab' lies within this box.
     """
     def anchor_to_absolute(anchor, level_diff, scaling_factor):
         """Convert a relative anchor to an absolute anchor
