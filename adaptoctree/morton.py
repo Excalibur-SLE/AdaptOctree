@@ -802,7 +802,7 @@ def are_adjacent(a, b, tree_depth):
             return anchor[:3]
         return anchor[:3]*scaling_factor
 
-    if a in morton.find_ancestors(b) or b in morton.find_ancestors(a):
+    if a in find_ancestors(b) or b in find_ancestors(a):
         return 0
 
     l_a_diff = tree_depth-find_level(a)

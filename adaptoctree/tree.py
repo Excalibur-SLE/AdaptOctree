@@ -282,19 +282,31 @@ def complete_tree(leaves):
 @numba.njit(cache=True)
 def find_interaction_lists(leaves, depth):
     """
-    Compute the interaction lists for all leaf keys
+    Compute the interaction lists for all leaf keys.
+
+    Parameters:
+    -----------
+    leaves : np.array(dtype=np.int64)
+    depth : np.int64
+
+    Returns:
+    --------
+    (np.array(dtype=np.int64))
     """
 
     leaves_set = set(leaves)
-    u = np.zeros(shape=(len(leaves), 90), dtype=np.int64)
-    x = np.zeros(shape=(len(leaves), 9), dtype=np.int64)
-    v = np.zeros(shape=(len(leaves), 189), dtype=np.int64)
-    w = np.zeros(shape=(len(leaves), 208), dtype=np.int64)
+    u = -np.ones(shape=(len(leaves), 90), dtype=np.int64)
+    x = -np.ones(shape=(len(leaves), 9), dtype=np.int64)
+    v = -np.ones(shape=(len(leaves), 189), dtype=np.int64)
+    w = -np.ones(shape=(len(leaves), 208), dtype=np.int64)
 
     def find_interaction_list(i, leaves, leaves_set, depth, u, x, v, w):
+        """Find interaction lists for a given node"""
 
-        def build_parent_level(key, leaves_set, colleagues_parents, parent_colleagues, depth):
-
+        def compute_parent_level(key, leaves_set, colleagues_parents, parent_colleagues, depth):
+            """
+            Find interaction lists at parent level of node.
+            """
             # U List (P2P)
             cp_in_tree = np.zeros_like(colleagues_parents)
             i = 0
@@ -323,8 +335,10 @@ def find_interaction_lists(leaves, depth):
 
             return len(adjacent), adjacent, len(not_adjacent), not_adjacent
 
-        def build_current_level(key, leaves_set, colleagues, parent_colleagues_children, depth):
-
+        def compute_current_level(key, leaves_set, colleagues, parent_colleagues_children, depth):
+            """
+            Find interaction lists at level of node.
+            """
             # U List (P2P)
             c_in_tree = np.zeros_like(colleagues)
             i = 0
@@ -351,8 +365,10 @@ def find_interaction_lists(leaves, depth):
 
             return len(adjacent), adjacent, len(not_adjacent), not_adjacent
 
-        def build_child_level(key, leaves_set, colleagues_children, depth):
-
+        def compute_child_level(key, leaves_set, colleagues_children, depth):
+            """
+            Find interaction lists at level of node's children.
+            """
             # U List (P2P)
             i = 0
             cc_in_tree = np.zeros_like(colleagues_children)
@@ -381,7 +397,7 @@ def find_interaction_lists(leaves, depth):
         parent_colleagues = morton.find_neighbours(parent)
         parent_colleagues_children = morton.find_children_vec(parent_colleagues).ravel()
 
-        pu_ptr, padj, px_ptr, pnadj = build_parent_level(
+        pu_ptr, padj, px_ptr, pnadj = compute_parent_level(
             key, leaves_set, colleagues_parents, parent_colleagues, depth
         )
 
@@ -389,14 +405,14 @@ def find_interaction_lists(leaves, depth):
         u_ptr = pu_ptr
         x[i][x_ptr:px_ptr] = pnadj
 
-        cu_ptr, cadj, pcc_ptr, pcc_nadj = build_current_level(
+        cu_ptr, cadj, pcc_ptr, pcc_nadj = compute_current_level(
             key, leaves_set, colleagues, parent_colleagues_children, depth
         )
         u[i][u_ptr:u_ptr+cu_ptr] = cadj
         u_ptr = pu_ptr+cu_ptr
         v[i][v_ptr:pcc_ptr] = pcc_nadj
 
-        ccu_ptr, ccadj, ccw_ptr, ccnadj = build_child_level(
+        ccu_ptr, ccadj, ccw_ptr, ccnadj = compute_child_level(
             key, leaves_set, colleagues_children, depth
         )
         u[i][u_ptr:u_ptr+ccu_ptr] = ccadj
