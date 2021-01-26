@@ -92,7 +92,7 @@ balanced = tree.balance(unbalanced, depth)
 
 Note: The first import of AdaptOctree will generate a cache of Numba compiled functions, and therefore might take some time.
 
-## 3) Computing Interaction Lists
+### Computing Interaction Lists
 
 The third main functional use of this module is to compute the interaction lists
 required by the particle FMM. We follow standard definitions as in [4].
@@ -101,7 +101,11 @@ required by the particle FMM. We follow standard definitions as in [4].
 ```python
 
 # Compute all interaction lists for leaves
-u, x, v, w = find_interaction_lists(balanced, depth)
+import adaptoctree.tree as tree
+
+# ... repeating steps above
+
+u, x, v, w = tree.find_interaction_lists(balanced, depth)
 
 print(u.shape) # (len(balanced), 90)
 print(x.shape) # (len(balanced), 9)
