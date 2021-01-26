@@ -802,6 +802,9 @@ def are_adjacent(a, b, tree_depth):
             return anchor[:3]
         return anchor[:3]*scaling_factor
 
+    if a in morton.find_ancestors(b) or b in morton.find_ancestors(a):
+        return 0
+
     l_a_diff = tree_depth-find_level(a)
     sf_a = 1 << l_a_diff
 
@@ -818,15 +821,17 @@ def are_adjacent(a, b, tree_depth):
     b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
 
     c_a = a + r_a
+    c_b = b + r_b
 
-    _min = a - r_b
-    _max = c_a + r_a + r_b
+    _min = -r_a - r_b
+    _max = r_a + r_b
 
-    diff = r_a + b
-    if (np.all(_min <= diff) and np.all(diff <= _max)):
-        return 1
+    diff = c_b-c_a
 
-    return 0
+    if np.any(diff > _max) or np.any(diff < _min):
+        return 0
+
+    return 1
 
 
 @numba.njit(
