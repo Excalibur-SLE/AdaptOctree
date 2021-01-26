@@ -136,3 +136,5 @@ We'd love to know what kind of projects you plan to use AdaptOctree in.
 [2] Tu, T., O'Hallaron, D. R., & Ghattas, O. (2005, November). Scalable parallel octree meshing for terascale applications. In SC'05: Proceedings of the 2005 ACM/IEEE conference on Supercomputing (pp. 4-4). IEEE.
 
 [3] [The ExaFMM Project](https://github.com/exafmm)
+
+[4] Lashuk, I., Chandramowlishwaran, A., Langston, H., Nguyen, T. A., Sampath, R., Shringarpure, A., & Biros, G. (2009, November). A massively parallel adaptive fast-multipole method on heterogeneous architectures. In Proceedings of the Conference on High Performance Computing Networking, Storage and Analysis (pp. 1-12). IEEE.
