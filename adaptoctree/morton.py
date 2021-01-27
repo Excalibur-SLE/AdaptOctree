@@ -778,7 +778,7 @@ def find_node_bounds(key, x0, r0):
 def are_adjacent(a, b, tree_depth):
     """
     Check if two node 'a' and 'b' are adjacent - i.e. they share a vertex, side
-        or face.
+        or face. Returns 1 if true, and 0 if false.
 
         Strategy: Convert node anchors into an absolute anchor, i.e. its
         position relative to the grid in which the finest box in the tree is.

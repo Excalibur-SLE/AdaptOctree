@@ -103,9 +103,12 @@ required by the particle FMM. We follow standard definitions as in [4].
 # Compute all interaction lists for leaves
 import adaptoctree.tree as tree
 
-# ... repeating steps above
+# Find linear representation as above ...
 
-u, x, v, w = tree.find_interaction_lists(balanced, depth)
+# Complete the linear tree, i.e. including all ancestors
+complete = tree.complete_tree(balanced)
+
+u, x, v, w = tree.find_interaction_lists(balanced, complete, depth)
 
 print(u.shape) # (len(balanced), 90)
 print(x.shape) # (len(balanced), 9)

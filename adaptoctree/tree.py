@@ -571,7 +571,6 @@ def find_interaction_lists(leaves, complete, depth):
             )
             v[i][v_ptr:pcc_ptr] = pcc_nadj
 
-
     for i in range(len(complete)):
         find_interaction_list(
             i, leaves, leaves_set, complete_set, depth, u, x, v, w
