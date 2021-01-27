@@ -92,6 +92,33 @@ balanced = tree.balance(unbalanced, depth)
 
 Note: The first import of AdaptOctree will generate a cache of Numba compiled functions, and therefore might take some time.
 
+### Computing Interaction Lists
+
+The third main functional use of this module is to compute the interaction lists
+required by the particle FMM. We follow standard definitions as in [4].
+
+
+```python
+# Compute all interaction lists for leaves
+import adaptoctree.tree as tree
+
+# Find linear representation as above ...
+
+# Complete the linear tree, i.e. including all ancestors
+complete = tree.complete_tree(balanced)
+
+u, x, v, w = tree.find_interaction_lists(balanced, complete, depth)
+
+print(u.shape) # (len(balanced), 90)
+print(x.shape) # (len(balanced), 9)
+print(v.shape) # (len(balanced), 189)
+print(w.shape) # (len(balanced), 208)
+```
+
+The size of each list is pre-allocated the maximum possible size of each list
+for a given node, so in practice many of their members will be '-1', which is
+used to indicate no entry.
+
 # Contributing
 
 We welcome any contributions, check the open issues for currently troublesome bugs or feature requests.
@@ -111,3 +138,5 @@ We'd love to know what kind of projects you plan to use AdaptOctree in.
 [2] Tu, T., O'Hallaron, D. R., & Ghattas, O. (2005, November). Scalable parallel octree meshing for terascale applications. In SC'05: Proceedings of the 2005 ACM/IEEE conference on Supercomputing (pp. 4-4). IEEE.
 
 [3] [The ExaFMM Project](https://github.com/exafmm)
+
+[4] Lashuk, I., Chandramowlishwaran, A., Langston, H., Nguyen, T. A., Sampath, R., Shringarpure, A., & Biros, G. (2009, November). A massively parallel adaptive fast-multipole method on heterogeneous architectures. In Proceedings of the Conference on High Performance Computing Networking, Storage and Analysis (pp. 1-12). IEEE.

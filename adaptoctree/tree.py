@@ -167,8 +167,8 @@ def balance_subroutine(tree, depth):
         nodes in linear octree.
 
         Strategy: Traverse the octree level by level, bottom-up, and check if
-        the parent's of a given node's parent lie in the tree, add them and their
-        respective siblings. This enforces the 2:1 constraint.
+        a given node's parent lies in the tree, add it and their respective
+        siblings. This enforces the 2:1 constraint.
     """
     balanced = set(tree)
 
@@ -245,3 +245,335 @@ def find_depth(tree):
     """
     levels = morton.find_level(np.unique(tree))
     return np.max(levels)
+
+
+
+@numba.njit(
+    [types.KeySet(types.Keys)],
+    cache=True)
+def _complete_tree(leaves):
+    """
+    Internal jit'd function for completing a tree.
+    """
+    tree_set = set(leaves)
+
+    for leaf in leaves:
+        tree_set.update(morton.find_ancestors(leaf))
+
+    return tree_set
+
+
+def complete_tree(leaves):
+    """
+    Complete a tree defined by its leaves.
+
+    Parmeters:
+    ----------
+    leaves : np.array(dtype=np.int64)
+
+    Returns:
+    --------
+    np.array(dtype=np.int64)
+    """
+    tree_set = _complete_tree(leaves)
+    return np.fromiter(tree_set, dtype=np.int64)
+
+
+@numba.njit(cache=True)
+def find_interaction_lists(leaves, complete, depth):
+    """
+    Compute all interaction lists for a complete tree. The restrictions of Numba
+        lead to a definition that uses closure to compute interactions lists for
+        each node in a loop.
+
+        Strategy: Compute shared neighbour data for each list for a given node,
+        compute each list, and add to pre-allocated array containing results for
+        all lists.
+
+    Parameters:
+    -----------
+    leaves : np.array(dtype=np.int64)
+        Linear octree, represented by its leaves.
+    complete: np.array(dtype=np.int64)
+        A complete octree, generated from its linear representation.
+    depth : np.int64
+        Depth of the octree.
+
+    Returns:
+    --------
+    (np.array(shape=(n_complete, n_nodes), dtype=np.int64))
+        Four-tuple containing the (u, x, v, w) lists. n_complete is the length of
+        the complete tree, and n_nodes are the number of nodes pre-allocated to
+        each list, determined by the maximum possible number of nodes in each
+        list e.g. 189 for the v list of M2L interactions. An entry of -1 in an
+        interaction list can be ignored, and marks abscence of a node.
+    """
+    leaves_set = set(leaves)
+    complete_set = set(complete)
+
+    u = -np.ones(shape=(len(complete), 90), dtype=np.int64)
+    x = -np.ones(shape=(len(complete), 20), dtype=np.int64)
+    v = -np.ones(shape=(len(complete), 189), dtype=np.int64)
+    w = -np.ones(shape=(len(complete), 208), dtype=np.int64)
+
+    def find_interaction_list(
+            i, leaves, leaves_set, complete_set, depth, u, x, v, w
+        ):
+        """
+        Internal method to find interaction list for a given key.
+
+        Parameters:
+        -----------
+        i : np.int64
+            Index of key in the complete tree.
+        leaves : np.array(dtype=np.int64)
+            Linear octree, represented by its leaves.
+        leaves_set : set(np.int64)
+            Set containing the linear octree.
+        complete_set : set(np.int64)
+            Set containing the completed octree.
+        depth : np.int64
+            Depth of the octree.
+        u : np.array(shape=(n_complete, 90))
+            U list container, nearest neighbours.
+        x : np.array(shape=(n_complete, 20))
+            X list container, colleagues of a node's parent which are
+            non-adjacent to the node - conjugate to the W list.
+        v : np.array(shape=(n_complete, 189))
+            V list container, children of a node's parent's colleagues which
+            are not adjacent to the node.
+        w : np.array(shape=(n_complete, 208))
+            W list container, children of colleagues, which are not adjacent to
+            the node.
+        """
+
+        def build_parent_level_leaf(
+                key, leaves_set, colleagues_parents, parent_colleagues, depth
+            ):
+            """
+            Build the portion of the interaction list that is expected at the
+                parent level of a node. Contributes to the U and X lists for
+                leaf keys.
+
+            Parameters:
+            ----------
+            key : np.int64
+                Key for the current node being considered.
+            leaves_set : set(np.int64)
+            colleagues_parents : np.array(np.int64)
+                The (unique) parents of the node's colleagues.
+            parent_colleagues : np.array(np.int64)
+                The colleagues of the node's parents.
+            depth : np.int64
+
+            Returns:
+            --------
+            (np.int64, np.array(dtype=np.int64))
+                Four-tuple (u_ptr, u, x_ptr, x), where 'u_ptr' is the length
+                of the U list contributions at this level.
+
+            """
+            # U List (P2P)
+            cp_in_tree = np.zeros_like(colleagues_parents)
+            i = 0
+            for cp in colleagues_parents:
+                if cp in leaves_set:
+                    cp_in_tree[i] = cp
+                    i += 1
+
+            cp_in_tree = cp_in_tree[:i]
+
+            adj_idxs = morton.are_adjacent_vec(key, cp_in_tree, depth)
+            adjacent = cp_in_tree[adj_idxs == 1]
+
+            # X List (P2L)
+            pc_in_tree = np.zeros_like(parent_colleagues)
+            i = 0
+            for pc in parent_colleagues:
+                if pc in leaves_set:
+                    pc_in_tree[i] = pc
+                    i += 1
+
+            pc_in_tree = pc_in_tree[:i]
+
+            not_adj_idxs = morton.are_adjacent_vec(key, pc_in_tree, depth)
+            not_adjacent = pc_in_tree[not_adj_idxs == 0]
+
+            return len(adjacent), adjacent, len(not_adjacent), not_adjacent
+
+        def build_current_level_leaf(
+                key, leaves_set, colleagues, parent_colleagues_children, depth
+            ):
+            """
+            Build the portion of the interaction list that is expected at the
+                level of a node. Contributes to the U and V lists for leaf keys.
+
+            Parameters:
+            -----------
+            key : np.int64
+                Key for the current node being considered.
+            leaves_set : set(np.int64)
+            colleagues : np.array(np.int64)
+                The node's colleagues.
+            parent_colleagues_children : np.array(np.int64)
+                The children of a node's parent's colleagues.
+            depth : np.int64
+
+            Returns:
+            --------
+            (np.int64, np.array(dtype=np.int64))
+                Four-tuple (u_ptr, u, v_ptr, v), where 'u_ptr' is the length
+                of the U list contributions at this level.
+            """
+            # U List (P2P)
+            c_in_tree = np.zeros_like(colleagues)
+            i = 0
+            for c in colleagues:
+                if c in leaves_set:
+                    c_in_tree[i] = c
+                    i += 1
+
+            c_in_tree = c_in_tree[:i]
+            adj_idxs = morton.are_adjacent_vec(key, c_in_tree, depth)
+            adjacent = c_in_tree[adj_idxs == 1]
+
+            # V List (M2L)
+            pcc_in_tree = np.zeros_like(parent_colleagues_children)
+            i = 0
+            for pcc in parent_colleagues_children:
+                if pcc in leaves_set:
+                    pcc_in_tree[i] = pcc
+                    i += 1
+
+            pcc_in_tree = pcc_in_tree[:i]
+            adj_idxs = morton.are_adjacent_vec(key, pcc_in_tree, depth)
+            not_adjacent = pcc_in_tree[adj_idxs == 0]
+
+            return len(adjacent), adjacent, len(not_adjacent), not_adjacent
+
+
+        def build_current_level_non_leaf(
+                key, complete_set, parent_colleagues_children, depth
+            ):
+            """
+            Build the portion of the interaction list that is expected at the
+                level of a node. Contributes to the V lists for non-leaf keys.
+
+            Parameters:
+            -----------
+            key : np.int64
+                Key for the current node being considered.
+            complete_set : set(np.int64)
+            parent_colleagues_children : np.array(np.int64)
+                The children of a node's parent's colleagues.
+            depth : np.int64
+
+            Returns:
+            --------
+            (np.int64, np.array(dtype=np.int64))
+                Tuple (v_ptr, v), where 'v_ptr' is the length of the V list
+                contributions at this level.
+            """
+            # V List (M2L)
+            pcc_in_tree = np.zeros_like(parent_colleagues_children)
+            i = 0
+            for pcc in parent_colleagues_children:
+                if pcc in complete_set:
+                    pcc_in_tree[i] = pcc
+                    i += 1
+
+            pcc_in_tree = pcc_in_tree[:i]
+            adj_idxs = morton.are_adjacent_vec(key, pcc_in_tree, depth)
+            not_adjacent = pcc_in_tree[adj_idxs == 0]
+
+            return len(not_adjacent), not_adjacent
+
+
+        def build_child_level_leaf(key, leaves_set, colleagues_children, depth):
+            """
+            Build the portion of the interaction list that is expected at the
+                level of a node's children. Contributes to the U and W lists for
+                leaf keys.
+
+            Parameters:
+            -----------
+            key : np.int64
+                Key for the current node being considered.
+            leaves_set : set(np.int64)
+            colleagues_children : np.array(np.int64)
+                The children of a node's colleagues.
+            depth : np.int64
+
+            Returns:
+            --------
+            (np.int64, np.array(dtype=np.int64))
+                Four-tuple (u_ptr, u, w_ptr, w), where 'u_ptr' is the length
+                of the U list contributions at this level.
+            """
+            # U List (P2P)
+            i = 0
+            cc_in_tree = np.zeros_like(colleagues_children)
+            for cc in colleagues_children:
+                if cc in leaves_set:
+                    cc_in_tree[i] = cc
+                    i += 1
+
+            cc_in_tree = cc_in_tree[:i]
+            adj_idxs = morton.are_adjacent_vec(key, cc_in_tree, depth)
+            adjacent = cc_in_tree[adj_idxs == 1]
+
+            # W List (M2P)
+            not_adjacent = cc_in_tree[adj_idxs == 0]
+            return len(adjacent), adjacent, len(not_adjacent), not_adjacent
+
+        u_ptr = 0
+        x_ptr = 0
+        v_ptr = 0
+        w_ptr = 0
+
+        key = complete[i]
+
+        if key in leaves_set:
+            parent = morton.find_parent(key)
+            colleagues = morton.find_neighbours(key)
+            colleagues_children = morton.find_children_vec(colleagues).ravel()
+            colleagues_parents = np.unique(morton.find_parent(colleagues))
+            parent_colleagues = morton.find_neighbours(parent)
+            parent_colleagues_children = morton.find_children_vec(parent_colleagues).ravel()
+
+            pu_ptr, padj, px_ptr, pnadj = build_parent_level_leaf(
+                key, leaves_set, colleagues_parents, parent_colleagues, depth
+            )
+
+            u[i][u_ptr:pu_ptr] = padj
+            u_ptr = pu_ptr
+            x[i][x_ptr:px_ptr] = pnadj
+
+            cu_ptr, cadj, pcc_ptr, pcc_nadj = build_current_level_leaf(
+                key, leaves_set, colleagues, parent_colleagues_children, depth
+            )
+            u[i][u_ptr:u_ptr+cu_ptr] = cadj
+            u_ptr = pu_ptr+cu_ptr
+            v[i][v_ptr:pcc_ptr] = pcc_nadj
+
+            ccu_ptr, ccadj, ccw_ptr, ccnadj = build_child_level_leaf(
+                key, leaves_set, colleagues_children, depth
+            )
+            u[i][u_ptr:u_ptr+ccu_ptr] = ccadj
+            w[i][w_ptr:ccw_ptr] = ccnadj
+
+        else:
+            parent = morton.find_parent(key)
+            parent_colleagues = morton.find_neighbours(parent)
+            parent_colleagues_children = morton.find_children_vec(parent_colleagues).ravel()
+            pcc_ptr, pcc_nadj = build_current_level_non_leaf(
+                key, complete_set, parent_colleagues_children, depth
+            )
+            v[i][v_ptr:pcc_ptr] = pcc_nadj
+
+    for i in range(len(complete)):
+        find_interaction_list(
+            i, leaves, leaves_set, complete_set, depth, u, x, v, w
+        )
+
+    return u, x, v, w

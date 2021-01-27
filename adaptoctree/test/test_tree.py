@@ -87,3 +87,69 @@ def test_no_overlaps(balanced):
             if i != j:
                 assert i not in morton.find_ancestors(j)
                 assert j not in morton.find_ancestors(i)
+
+
+@pytest.mark.parametrize(
+    "_tree, expected",
+    [
+        (np.array([1, 2, 3]), 3)
+    ]
+)
+def test_find_depth(_tree, expected):
+    result = tree.find_depth(_tree)
+
+    assert result == expected
+
+
+def test_complete_tree(balanced):
+    complete = tree.complete_tree(balanced)
+
+    for node in balanced:
+        ancestors = morton.find_ancestors(node)
+        for a in ancestors:
+            assert a in complete
+
+
+def test_find_interaction_lists(balanced):
+    """
+    Currently only tests interaction lists for nodes at leaf level, mainly
+        checking that the constraints on their level, and adjacency are
+        satisfied.
+    """
+    depth = tree.find_depth(balanced)
+    complete = tree.complete_tree(balanced)
+    u, x, v, w = tree.find_interaction_lists(balanced, complete, depth)
+
+    for i in range(len(complete)):
+        key = complete[i]
+
+        if key in balanced:
+
+            # Check all u list members are adjacent
+            u_i = u[i][u[i] != -1]
+            u_adj_idxs = morton.are_adjacent_vec(key, u_i, depth)
+            assert np.all(u_adj_idxs == 1)
+
+            # Check all x list members are at the right level, and not adjacent
+            x_i = x[i][x[i] != -1]
+            x_nadj_idxs = morton.are_adjacent_vec(key, x_i, depth)
+            assert np.all(x_nadj_idxs == 0)
+
+            x_levels = morton.find_level(x_i)
+            assert np.all(x_levels == morton.find_level(morton.find_parent(key)))
+
+            # Check all w list members are at right level, and not adjacent
+            w_i = w[i][w[i] != -1]
+            w_nadj_idxs = morton.are_adjacent_vec(key, w_i, depth)
+            assert np.all(w_nadj_idxs == 0)
+
+            w_levels = morton.find_level(w_i)
+            assert np.all(w_levels == (morton.find_level(key)-1))
+
+            # Check all v list members are at right level, and not adjacent
+            v_i = v[i][v[i] != -1]
+            v_nadj_idxs = morton.are_adjacent_vec(key, v_i, depth)
+            assert np.all(v_nadj_idxs == 0)
+
+            v_levels = morton.find_level(v_i)
+            assert np.all(v_levels == morton.find_level(key))

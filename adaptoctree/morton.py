@@ -441,6 +441,21 @@ def find_children(key):
 
 
 @numba.njit(
+    [types.LongArray2D(types.Keys)],
+    cache=True
+)
+def find_children_vec(keys):
+    """Find children of an array of keys"""
+    result = np.zeros(shape=(len(keys), 8), dtype=np.int64)
+
+    for i, key in enumerate(keys):
+        children = find_children(key)
+        result[i][0:8] = children
+
+    return result
+
+
+@numba.njit(
     [types.Keys(types.Key, types.Long)],
     cache=True
 )
@@ -725,45 +740,6 @@ def quicksort(tree, low, high):
         quicksort(tree, p+1, high)
 
 
-def are_neighbours(a, b, x0, r0):
-    """
-    Check if nodes 'a' and 'b' are neighbours.
-
-    Parameters:
-    -----------
-    a : np.int64
-        Morton key
-    b : np.int64
-        Morton key
-    x0 : np.array(shape=(3,), dtype=np.float64)
-        Center of root node of Octree.
-    r0 : np.float64
-        Half side length of root node.
-
-    Returns:
-    --------
-    bool
-        True if 'a' and 'b' are neighbours, False otherwise.
-    """
-    if a in find_ancestors(b):
-        return False
-    if b in find_ancestors(a):
-        return False
-
-    level_a = find_level(a)
-    radius_a = r0 / (1 << level_a)
-
-    level_b = find_level(b)
-    radius_b = r0 / (1 << level_b)
-
-    centre_a = find_center_from_key(a, x0, r0)
-    centre_b = find_center_from_key(b, x0, r0)
-
-    if np.linalg.norm(centre_a - centre_b) <= np.sqrt(3) * (radius_b + radius_a):
-        return True
-    return False
-
-
 def find_node_bounds(key, x0, r0):
     """
     Find the physical node (box) bounds, described by a given Morton key.
@@ -792,3 +768,82 @@ def find_node_bounds(key, x0, r0):
     upper_bound = center + displacement
 
     return lower_bound, upper_bound
+
+
+@numba.njit(
+    [types.Long(types.Key, types.Key, types.Long)],
+    cache=True
+)
+def are_adjacent(a, b, tree_depth):
+    """
+    Check if two node 'a' and 'b' are adjacent - i.e. they share a vertex, side
+        or face. Returns 1 if true, and 0 if false.
+
+        Strategy: Convert node anchors into an absolute anchor, i.e. its
+        position relative to the grid in which the finest box in the tree is.
+        From this, create a bounding box around the centre of 'a' with a side
+        length corresponding to the side length of 'a' and 'b' added together.
+        Then check whether the vector 'ab' lies within this box.
+    """
+    def anchor_to_absolute(anchor, level_diff, scaling_factor):
+        """Convert a relative anchor to an absolute anchor
+
+        Parameters:
+        -----------
+        anchor : np.array(shape=(4,), dtype=np.int64)
+        level_diff : int
+            Calculated from depth-anchor[3]
+        scaling_factor : int
+            The relative size of the half side length, with respect to the
+            half side length of the smallest node in the tree.
+        """
+        if level_diff == 0:
+            return anchor[:3]
+        return anchor[:3]*scaling_factor
+
+    if a in find_ancestors(b) or b in find_ancestors(a):
+        return 0
+
+    l_a_diff = tree_depth-find_level(a)
+    sf_a = 1 << l_a_diff
+
+    l_b_diff = tree_depth - find_level(b)
+    sf_b = 1 << l_b_diff
+
+    r_a = sf_a*0.5
+    r_b = sf_b*0.5
+
+    anchor_a = decode_key(a)
+    anchor_b = decode_key(b)
+
+    a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
+    b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
+
+    c_a = a + r_a
+    c_b = b + r_b
+
+    _min = -r_a - r_b
+    _max = r_a + r_b
+
+    diff = c_b-c_a
+
+    if np.any(diff > _max) or np.any(diff < _min):
+        return 0
+
+    return 1
+
+
+@numba.njit(
+    [types.LongArray(types.Key, types.Keys, types.Long)],
+    cache=True
+)
+def are_adjacent_vec(key, key_vec, tree_depth):
+    """
+    Apply are_adjacent to a vector of keys.
+    """
+    result = np.zeros_like(key_vec)
+    i = 0
+    for k in key_vec:
+        result[i] = are_adjacent(key, k, tree_depth)
+        i += 1
+    return result

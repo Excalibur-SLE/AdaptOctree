@@ -239,14 +239,21 @@ def test_find_node_bounds(key, x0, r0, expected):
 @pytest.mark.parametrize(
     "a, b, expected",
     [
-        # (1, 229377, True),
+        (1, 229377, True),
         (2, 2064386, False)
     ]
 )
-def test_are_neighbours(a, b, expected):
-    octree_center = np.array([0.5, 0.5, 0.5])
-    octree_radius = 0.5
+def test_are_adjacent(a, b, expected):
+    result = morton.are_adjacent(a, b, 2)
+    assert result == expected
 
-    result = morton.are_neighbours(a, b, octree_center, octree_radius)
 
+@pytest.mark.parametrize(
+    "key, expected",
+    [
+        (5, {0,1,2,3,4,5})
+    ]
+)
+def test_find_ancestors(key, expected):
+    result = morton.find_ancestors(key)
     assert result == expected
