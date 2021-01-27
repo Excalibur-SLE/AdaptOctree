@@ -99,7 +99,6 @@ required by the particle FMM. We follow standard definitions as in [4].
 
 
 ```python
-
 # Compute all interaction lists for leaves
 import adaptoctree.tree as tree
 
