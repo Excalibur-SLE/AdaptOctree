@@ -111,7 +111,10 @@ def test_complete_tree(balanced):
 
 
 def test_find_interaction_lists(balanced):
-    """Currently only tests interaction lists for nodes at leaf level
+    """
+    Currently only tests interaction lists for nodes at leaf level, mainly
+        checking that the constraints on their level, and adjacency are
+        satisfied.
     """
     depth = tree.find_depth(balanced)
     complete = tree.complete_tree(balanced)
