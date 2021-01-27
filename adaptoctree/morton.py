@@ -740,7 +740,6 @@ def quicksort(tree, low, high):
         quicksort(tree, p+1, high)
 
 
-
 def find_node_bounds(key, x0, r0):
     """
     Find the physical node (box) bounds, described by a given Morton key.
