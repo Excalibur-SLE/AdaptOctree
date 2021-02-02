@@ -51,7 +51,7 @@ XY_MASK = types.Long(0b011011011011011011011011011011011011011011011011)
 MAXIMUM_LEVEL = types.Long(16)
 
 
-def find_center_from_anchor(anchor, x0, r0):
+def find_physical_center_from_anchor(anchor, x0, r0):
     """
     Find center of given Octree node from it's anchor.
 
@@ -78,7 +78,20 @@ def find_center_from_anchor(anchor, x0, r0):
     return (anchor[:3] + 0.5) * side_length + xmin
 
 
-def find_center_from_key(key, x0, r0):
+@numba.njit(
+    [types.Coord(types.Anchor)],
+    cache=True
+)
+def find_relative_center_from_anchor(anchor):
+    """
+    Find relative center of a node described by an anchor.
+    """
+    level = anchor[3]
+    radius = np.float64(1 / (1 << (level+1)))
+    return anchor[:3] + radius
+
+
+def find_physical_center_from_key(key, x0, r0):
     """
     Find the center of a given Octree node from it's Morton key.
 
@@ -96,7 +109,7 @@ def find_center_from_key(key, x0, r0):
     np.array(shape=(3,))
     """
     anchor = decode_key(key)
-    return find_center_from_anchor(anchor, x0, r0)
+    return find_physical_center_from_anchor(anchor, x0, r0)
 
 
 @numba.jit(
@@ -366,6 +379,17 @@ def decode_key_lut(key, x_lookup_decode, y_lookup_decode, z_lookup_decode):
     z = decode_key_lut_helper(key, z_lookup_decode, 0)
 
     return np.array([x, y, z, level], np.int64)
+
+
+@numba.njit(
+    [types.Coord(types.Key)],
+    cache=True)
+def find_relative_center_from_key(key):
+    """
+    Find relative center of a node described by a key.
+    """
+    anchor = decode_key(key)
+    return find_relative_center_from_anchor(anchor)
 
 
 @numba.njit(
@@ -757,7 +781,7 @@ def find_node_bounds(key, x0, r0):
         Bounds corresponding to (0, 0, 0) and (1, 1, 1) indices of a unit box.
     """
 
-    center = find_center_from_key(key, x0, r0)
+    center = find_physical_center_from_key(key, x0, r0)
 
     level = find_level(key)
     radius = r0 / (1 << level)
