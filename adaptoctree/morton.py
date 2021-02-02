@@ -867,7 +867,7 @@ def find_relative_center_from_anchor(anchor, depth):
     level = anchor[3]
     level_diff = depth-level
     scale_factor = 1 << level_diff
-    radius = 1 / (1 << (level+1))
+    radius = scale_factor*0.5
 
     absolute_anchor = anchor_to_absolute(anchor, level_diff, scale_factor)
 
