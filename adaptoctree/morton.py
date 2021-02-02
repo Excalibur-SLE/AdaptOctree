@@ -78,19 +78,6 @@ def find_physical_center_from_anchor(anchor, x0, r0):
     return (anchor[:3] + 0.5) * side_length + xmin
 
 
-@numba.njit(
-    [types.Coord(types.Anchor)],
-    cache=True
-)
-def find_relative_center_from_anchor(anchor):
-    """
-    Find relative center of a node described by an anchor.
-    """
-    level = anchor[3]
-    radius = np.float64(1 / (1 << (level+1)))
-    return anchor[:3] + radius
-
-
 def find_physical_center_from_key(key, x0, r0):
     """
     Find the center of a given Octree node from it's Morton key.
@@ -379,17 +366,6 @@ def decode_key_lut(key, x_lookup_decode, y_lookup_decode, z_lookup_decode):
     z = decode_key_lut_helper(key, z_lookup_decode, 0)
 
     return np.array([x, y, z, level], np.int64)
-
-
-@numba.njit(
-    [types.Coord(types.Key)],
-    cache=True)
-def find_relative_center_from_key(key):
-    """
-    Find relative center of a node described by a key.
-    """
-    anchor = decode_key(key)
-    return find_relative_center_from_anchor(anchor)
 
 
 @numba.njit(
@@ -795,6 +771,27 @@ def find_node_bounds(key, x0, r0):
 
 
 @numba.njit(
+    [types.Anchor(types.Anchor, types.Long, types.Long)],
+    cache=True
+)
+def anchor_to_absolute(anchor, level_diff, scaling_factor):
+    """Convert a relative anchor to an absolute anchor
+
+    Parameters:
+    -----------
+    anchor : np.array(shape=(4,), dtype=np.int64)
+    level_diff : int
+        Calculated from depth-anchor[3]
+    scaling_factor : int
+        The relative size of the half side length, with respect to the
+        half side length of the smallest node in the tree.
+    """
+    if level_diff == 0:
+        return anchor[:3]
+    return anchor[:3]*scaling_factor
+
+
+@numba.njit(
     [types.Long(types.Key, types.Key, types.Long)],
     cache=True
 )
@@ -809,21 +806,6 @@ def are_adjacent(a, b, tree_depth):
         length corresponding to the side length of 'a' and 'b' added together.
         Then check whether the vector 'ab' lies within this box.
     """
-    def anchor_to_absolute(anchor, level_diff, scaling_factor):
-        """Convert a relative anchor to an absolute anchor
-
-        Parameters:
-        -----------
-        anchor : np.array(shape=(4,), dtype=np.int64)
-        level_diff : int
-            Calculated from depth-anchor[3]
-        scaling_factor : int
-            The relative size of the half side length, with respect to the
-            half side length of the smallest node in the tree.
-        """
-        if level_diff == 0:
-            return anchor[:3]
-        return anchor[:3]*scaling_factor
 
     if a in find_ancestors(b) or b in find_ancestors(a):
         return 0
@@ -871,3 +853,33 @@ def are_adjacent_vec(key, key_vec, tree_depth):
         result[i] = are_adjacent(key, k, tree_depth)
         i += 1
     return result
+
+
+@numba.njit(
+    [types.Coord(types.Anchor, types.Long)],
+    cache=True
+)
+def find_relative_center_from_anchor(anchor, depth):
+    """
+    Find relative center of a node described by an anchor defined by the finest
+        level of the tree.
+    """
+    level = anchor[3]
+    level_diff = depth-level
+    scale_factor = 1 << level_diff
+    radius = 1 / (1 << (level+1))
+
+    absolute_anchor = anchor_to_absolute(anchor, level_diff, scale_factor)
+
+    return absolute_anchor + radius
+
+
+@numba.njit(
+    [types.Coord(types.Key, types.Long)],
+    cache=True)
+def find_relative_center_from_key(key, depth):
+    """
+    Find relative center of a node described by a key.
+    """
+    anchor = decode_key(key)
+    return find_relative_center_from_anchor(anchor, depth)
