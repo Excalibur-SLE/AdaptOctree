@@ -8,6 +8,36 @@ import pytest
 import adaptoctree.morton as morton
 
 
+@pytest.mark.parametrize(
+    "anchor, depth, expected",
+    [
+        (
+            np.array([0, 0, 0, 0], dtype=np.int64),
+            np.int64(0),
+            np.array([0.5, 0.5, 0.5], dtype=np.float64)
+        )
+    ]
+)
+def test_find_relative_center_from_anchor(anchor, depth, expected):
+
+    result = morton.find_relative_center_from_anchor(anchor, depth)
+    assert np.array_equal(result, expected)
+    assert isinstance(result[0], np.float64)
+
+
+@pytest.mark.parametrize(
+    "key, depth, expected",
+    [
+        (
+            np.int64(0), np.int64(0), np.array([0.5, 0.5, 0.5], dtype=np.float64)
+        )
+    ]
+)
+def test_find_relative_center_from_key(key, depth, expected):
+
+    result = morton.find_relative_center_from_key(key, depth)
+    assert np.array_equal(result, expected)
+    assert isinstance(result[0], np.float64)
 
 
 @pytest.mark.parametrize(
@@ -21,9 +51,9 @@ import adaptoctree.morton as morton
         )
     ]
 )
-def test_find_center_from_anchor(anchor, x0, r0, expected):
+def test_find_physical_center_from_anchor(anchor, x0, r0, expected):
 
-    result = morton.find_center_from_anchor(anchor, x0, r0)
+    result = morton.find_physical_center_from_anchor(anchor, x0, r0)
     assert np.array_equal(result, expected)
     assert isinstance(result[0], np.float64)
 
@@ -39,9 +69,9 @@ def test_find_center_from_anchor(anchor, x0, r0, expected):
         )
     ]
 )
-def test_find_center_from_key(key, x0, r0, expected):
+def test_find_physical_center_from_key(key, x0, r0, expected):
 
-    result = morton.find_center_from_key(key, x0, r0)
+    result = morton.find_physical_center_from_key(key, x0, r0)
     assert np.array_equal(result, expected)
 
 
