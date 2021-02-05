@@ -129,6 +129,18 @@ def find_bounds(particles):
 
 
 @numba.njit(
+    [types.Double(types.Long)],
+    cache=True
+)
+def find_relative_radius(level_diff):
+    """
+    Find the relative radius of a node with respect to the root node, which is
+        assumed to have side-length 1.
+    """
+    return 0.5 * (1 << level_diff)
+
+
+@numba.njit(
     [types.Coord(types.Coord, types.Coord)],
     cache=True
 )
