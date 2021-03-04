@@ -804,6 +804,57 @@ def anchor_to_absolute(anchor, level_diff, scaling_factor):
 
 
 @numba.njit(
+    [types.Coord(types.Key, types.Key, types.Long)],
+    cache=True
+)
+def find_transfer_vector(a, b, tree_depth):
+    """
+    Find transfer vector between two nodes' Morton keys, with respect to depth
+        of the tree.
+    """
+    if a in find_ancestors(b) or b in find_ancestors(a):
+        return np.array([0., 0., 0.])
+
+    l_a_diff = tree_depth-find_level(a)
+    sf_a = 1 << l_a_diff
+
+    l_b_diff = tree_depth - find_level(b)
+    sf_b = 1 << l_b_diff
+
+    r_a = sf_a*0.5
+    r_b = sf_b*0.5
+
+    anchor_a = decode_key(a)
+    anchor_b = decode_key(b)
+
+    a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
+    b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
+
+    c_a = a + r_a
+    c_b = b + r_b
+
+    return c_b-c_a
+
+
+@numba.njit(
+    [types.Coords(types.Key, types.Keys, types.Long)],
+    cache=True
+)
+def find_transfer_vectors(a, b_array, tree_depth):
+    """
+    Find transfer vectors between a node, and a vector of other nodes' Morton
+        keys with respect to tree depth.
+    """
+    result = np.zeros(shape=(len(b_array), 3), dtype=np.float64)
+
+    for i in range(len(b_array)):
+        b = b_array[i]
+        result[i, :] = find_transfer_vector(a, b, tree_depth)
+
+    return result
+
+
+@numba.njit(
     [types.Long(types.Key, types.Key, types.Long)],
     cache=True
 )
