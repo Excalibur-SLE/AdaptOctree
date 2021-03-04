@@ -267,6 +267,17 @@ def test_find_node_bounds(key, x0, r0, expected):
 
 
 @pytest.mark.parametrize(
+    "a, b, tree_depth, expected",
+    [
+        (1, 32769, 1, np.array([1, 0, 0], dtype=np.int64))
+    ]
+)
+def test_find_transfer_vector(a, b, tree_depth, expected):
+    result = morton.find_transfer_vector(a, b, tree_depth)
+    assert np.allclose(result, expected)
+
+
+@pytest.mark.parametrize(
     "a, b, expected",
     [
         (1, 229377, True),
