@@ -577,3 +577,86 @@ def find_interaction_lists(leaves, complete, depth):
         )
 
     return u, x, v, w
+
+
+@numba.njit(
+    [types.Keys(types.Key, types.Long)],
+    cache=True
+)
+def find_dense_v_list(key, depth):
+    """
+    Find the V list of a key if it were in a non-adaptive tree.
+    """
+
+    parent = morton.find_parent(key)
+    parent_neighbours = morton.find_neighbours(parent)
+    parent_neigbhours_children = morton.find_children_vec(parent_neighbours).ravel()
+    are_adj = morton.are_adjacent_vec(key, parent_neigbhours_children, depth)
+
+    return parent_neigbhours_children[are_adj == 0]
+
+
+def find_unique_v_list_interactions(level, x0, r0, depth):
+    """
+    Find the unique V list interactions for a given level of the octree.
+        There are at most 316 = 7^3-3^3 such interactions in the non-adaptive
+        case.
+
+        Strategy: Find the Morton encoding of a point at the centre of the
+        domain, and compute redundant transfer vectors of all siblings.
+
+    Parameters:
+    -----------
+    level : np.int64
+        Octree level
+    x0 : np.array(shape=(3,), dtype=np.float64)
+        Center of octree root node.
+    r0 : np.float64
+        Half side length of octree root node.
+    depth : np.int64
+        Depth of the octree.
+
+    Returns:
+    --------
+    (np.array(np.int64), np.array(np.int64), np.array(np.int64))
+        Return a triple containing (i) The Morton keys of unique source nodes
+        (ii) Their corresponding target nodes and (iii) a SHA256 hash
+        corresponding to their transfer vector
+    """
+
+    # Encode the centre, and find it's siblings.
+    # This will give the set with the dense interaction list.
+    center = morton.encode_point(x0, level, x0, r0)
+    siblings = morton.find_siblings(center)
+
+    redundant_v_list = []
+    hashed_transfer_vectors = []
+
+    targets = []
+
+    for sibling in siblings:
+        v_list = find_dense_v_list(sibling, depth)
+
+        redundant_v_list.extend(v_list)
+        targets.extend(sibling*np.ones(len(v_list), dtype=np.int64))
+
+        # Compute all transfer vectors
+        transfer_vectors = morton.find_transfer_vectors(sibling, v_list, depth)
+        hashed_transfer_vectors.extend([hash(str(vec)) for vec in transfer_vectors])
+
+    targets = np.array(targets).ravel()
+    redundant_v_list = np.array(redundant_v_list)
+
+    unique_idxs = []
+    unique_transfer_hashes = []
+
+    for i in range(len(hashed_transfer_vectors)):
+        hashed_transfer_vector = hashed_transfer_vectors[i]
+
+        if hashed_transfer_vector not in unique_transfer_hashes:
+            unique_idxs.append(i)
+            unique_transfer_hashes.append(hashed_transfer_vector)
+
+    unique_transfer_hashes = np.array(unique_transfer_hashes)
+
+    return redundant_v_list[unique_idxs], targets[unique_idxs], unique_transfer_hashes
