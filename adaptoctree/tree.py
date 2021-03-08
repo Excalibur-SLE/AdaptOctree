@@ -597,7 +597,7 @@ def find_dense_v_list(key, depth):
     return parent_neigbhours_children[are_adj == 0]
 
 
-def find_unique_v_list_interactions(level, x0, r0, depth):
+def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
     """
     Find the unique V list interactions for a given level of the octree.
         There are at most 316 = 7^3-3^3 such interactions in the non-adaptive
@@ -616,6 +616,8 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
         Half side length of octree root node.
     depth : np.int64
         Depth of the octree.
+    digest_size : np.int64
+        Size of hashed digest, default 10.
 
     Returns:
     --------
@@ -646,7 +648,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
 
         transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
         hashed_transfer_vectors.extend(
-            [utils.deterministic_hash(str(vec)) for vec in transfer_vectors]
+            [utils.deterministic_hash(str(vec), digest_size) for vec in transfer_vectors]
         )
 
     targets = np.array(targets).ravel()
