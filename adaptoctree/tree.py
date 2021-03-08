@@ -620,8 +620,8 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     --------
     (np.array(np.int64), np.array(np.int64), np.array(np.int64))
         Return a triple containing (i) The Morton keys of unique source nodes
-        (ii) Their corresponding target nodes and (iii) a SHA256 hash
-        corresponding to their transfer vector
+        (ii) Their corresponding target nodes and (iii) an array of SHA256 hashes
+        corresponding to their transfer vectors for lookup.
     """
 
     # Encode the centre, and find it's siblings.
@@ -634,13 +634,14 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
 
     targets = []
 
+    # Compute all (redundant) transfer vectors for central key, and
+    # its siblings
     for sibling in siblings:
         v_list = find_dense_v_list(sibling, depth)
 
         redundant_v_list.extend(v_list)
         targets.extend(sibling*np.ones(len(v_list), dtype=np.int64))
 
-        # Compute all transfer vectors
         transfer_vectors = morton.find_transfer_vectors(sibling, v_list, depth)
         hashed_transfer_vectors.extend([hash(str(vec)) for vec in transfer_vectors])
 
@@ -650,6 +651,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     unique_idxs = []
     unique_transfer_hashes = []
 
+    # Compute the unique transfer vectors, in hashed form
     for i in range(len(hashed_transfer_vectors)):
         hashed_transfer_vector = hashed_transfer_vectors[i]
 
