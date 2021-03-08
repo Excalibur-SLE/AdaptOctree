@@ -7,6 +7,7 @@ import numpy as np
 
 import adaptoctree.morton as morton
 import adaptoctree.types as types
+import adaptoctree.utils as utils
 
 
 @numba.njit(
@@ -644,7 +645,9 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
         targets.extend(neighbour*np.ones(len(v_list), dtype=np.int64))
 
         transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
-        hashed_transfer_vectors.extend([hash(str(vec)) for vec in transfer_vectors])
+        hashed_transfer_vectors.extend(
+            [utils.deterministic_hash(str(vec)) for vec in transfer_vectors]
+        )
 
     targets = np.array(targets).ravel()
     redundant_v_list = np.array(redundant_v_list)
