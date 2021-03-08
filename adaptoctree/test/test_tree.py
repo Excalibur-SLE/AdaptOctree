@@ -153,3 +153,36 @@ def test_find_interaction_lists(balanced):
 
             v_levels = morton.find_level(v_i)
             assert np.all(v_levels == morton.find_level(key))
+
+
+def test_find_dense_v_list():
+
+    x0 = np.array([0.5, 0.5, 0.5])
+    r0 = 0.5
+    depth = 3
+    key = morton.encode_point(x0, depth, x0, r0)
+
+    v_list = tree.find_dense_v_list(key, depth)
+
+    are_adj = morton.are_adjacent_vec(key, v_list, depth)
+
+    # Test that v list members are not adjacent to the key
+    assert np.all(are_adj == 0)
+
+    # Test that v list members are the same level as the key
+    assert np.all(morton.find_level(v_list) == morton.find_level(key))
+
+    # Test that the v list is dense
+    assert len(v_list) == 189
+
+
+def test_find_unique_v_list_interactions():
+
+    x0 = np.array([0.5, 0.5, 0.5])
+    r0 = 0.5
+    depth = 3
+
+    v, t, h = tree.find_unique_v_list_interactions(depth, x0, r0, depth)
+
+    # Test that the v list is dense
+    assert len(v) == 316
