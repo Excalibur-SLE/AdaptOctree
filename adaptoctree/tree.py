@@ -624,10 +624,11 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
         corresponding to their transfer vectors for lookup.
     """
 
-    # Encode the centre, and find it's siblings.
+    # Encode the centre, and find it's neighbours
     # This will give the set with the dense interaction list.
     center = morton.encode_point(x0, level, x0, r0)
-    siblings = morton.find_siblings(center)
+    neighbours = morton.find_neighbours(center)
+    neighbours = np.hstack((neighbours, np.array([center])))
 
     redundant_v_list = []
     hashed_transfer_vectors = []
@@ -635,14 +636,14 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     targets = []
 
     # Compute all (redundant) transfer vectors for central key, and
-    # its siblings
-    for sibling in siblings:
-        v_list = find_dense_v_list(sibling, depth)
+    # its neighbours
+    for neighbour in neighbours:
+        v_list = find_dense_v_list(neighbour, depth)
 
         redundant_v_list.extend(v_list)
-        targets.extend(sibling*np.ones(len(v_list), dtype=np.int64))
+        targets.extend(neighbour*np.ones(len(v_list), dtype=np.int64))
 
-        transfer_vectors = morton.find_transfer_vectors(sibling, v_list, depth)
+        transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
         hashed_transfer_vectors.extend([hash(str(vec)) for vec in transfer_vectors])
 
     targets = np.array(targets).ravel()

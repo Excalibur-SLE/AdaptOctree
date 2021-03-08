@@ -176,13 +176,25 @@ def test_find_dense_v_list():
     assert len(v_list) == 189
 
 
-def test_find_unique_v_list_interactions():
-
-    x0 = np.array([0.5, 0.5, 0.5])
-    r0 = 0.5
-    depth = 3
-
-    v, t, h = tree.find_unique_v_list_interactions(depth, x0, r0, depth)
+@pytest.mark.parametrize(
+    "x0, r0, depth, expected",
+    [
+        (
+            np.array([0.5, 0.5, 0.5]),
+            0.5,
+            2,
+            189
+        ),
+        (
+            np.array([0.5, 0.5, 0.5]),
+            0.5,
+            3,
+            316
+        )
+    ]
+)
+def test_find_unique_v_list_interactions(x0, r0, depth, expected):
 
     # Test that the v list is dense
-    assert len(v) == 316
+    v, t, h = tree.find_unique_v_list_interactions(depth, x0, r0, depth)
+    assert len(v) == expected
