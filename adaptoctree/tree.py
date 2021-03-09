@@ -618,7 +618,11 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
         case.
 
         Strategy: Find the Morton encoding of a point at the centre of the
-        domain, and compute redundant transfer vectors of all siblings.
+        domain, and compute redundant transfer vectors of all siblings and
+        neighbours. Repeat this for the Morton keys of all vertices. This is
+        a hack and contains a lot of redundant calculations
+
+        #TODO: optimise
 
     Parameters:
     -----------
