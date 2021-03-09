@@ -11,9 +11,8 @@ with open(PATH_VERSION, mode='r', encoding='utf-8') as f:
     exec(f.read(), ABOUT)
 
 requirements = [
-    "numba",
-    "numpy",
-    "pytest"
+    "numba==0.52.0",
+    "pytest==6.2.2"
 ]
 
 
