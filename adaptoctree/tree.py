@@ -597,6 +597,26 @@ def find_dense_v_list(key, depth):
     return parent_neigbhours_children[are_adj == 0]
 
 
+@numba.jit(
+    [types.Coords(types.Coord, types.Double)],
+    cache=True
+)
+def find_vertices(x0, r0):
+    """
+    Find the physical vertices of the root node of an Octree.
+    """
+    return np.array([
+        [x0[0]+r0, x0[1]+r0, x0[2]+r0],
+        [x0[0]-r0, x0[1]+r0, x0[2]+r0],
+        [x0[0]+r0, x0[1]-r0, x0[2]+r0],
+        [x0[0]+r0, x0[1]+r0, x0[2]-r0],
+        [x0[0]-r0, x0[1]-r0, x0[2]+r0],
+        [x0[0]-r0, x0[1]+r0, x0[2]-r0],
+        [x0[0]+r0, x0[1]-r0, x0[2]-r0],
+        [x0[0]-r0, x0[1]-r0, x0[2]-r0],
+    ])
+
+
 def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
     """
     Find the unique V list interactions for a given level of the octree.
@@ -604,7 +624,9 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
         case.
 
         Strategy: Find the Morton encoding of a point at the centre of the
-        domain, and compute redundant transfer vectors of all siblings.
+        domain, and compute redundant transfer vectors of all siblings and
+        neighbours. Repeat this for the Morton keys of all vertices. This is
+        a hack and contains a lot of redundant calculations.
 
     Parameters:
     -----------
@@ -623,15 +645,23 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
     --------
     (np.array(np.int64), np.array(np.int64), np.array(np.int64))
         Return a triple containing (i) The Morton keys of unique source nodes
-        (ii) Their corresponding target nodes and (iii) an array of SHA256 hashes
-        corresponding to their transfer vectors for lookup.
+        (ii) Their corresponding target nodes and (iii) an array of blake2b
+        hashes corresponding to their transfer vectors for lookup.
     """
-
     # Encode the centre, and find it's neighbours
-    # This will give the set with the dense interaction list.
     center = morton.encode_point(x0, level, x0, r0)
     neighbours = morton.find_neighbours(center)
     neighbours = np.hstack((neighbours, np.array([center])))
+
+    # Encode the vertices and their neighbours
+    vertices = find_vertices(x0, r0)
+    vertices = [morton.encode_point(v, level, x0, r0) for v in vertices]
+    vertices_siblings = np.array([morton.find_siblings(v) for v in vertices]).ravel()
+
+    # This is a hack, and contains a lot of redundant calculations
+    # TODO: Optimise for the level 2 of an octree, these are all algebraic
+    # relationships.
+    neighbours = np.hstack((neighbours, vertices_siblings))
 
     redundant_v_list = []
     hashed_transfer_vectors = []

@@ -183,7 +183,7 @@ def test_find_dense_v_list():
             np.array([0.5, 0.5, 0.5]),
             0.5,
             2,
-            189
+            316
         ),
         (
             np.array([0.5, 0.5, 0.5]),
