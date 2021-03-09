@@ -10,18 +10,10 @@ AdaptOctree is a work in process, please do report issues as you find them.
 
 # Installation
 
-Install from source into a Conda/Miniconda environment.
+Install into a conda/mini-conda environment
 
 ```bash
-# Clone repository
-git clone git@github.com:Excalibur-SLE/AdaptOctree.git
-cd AdaptOctree
-
-# Build Conda package
-conda build conda.recipe
-
-# Install conda package
-conda install --use-local adaptoctree
+conda install -c skailasa adaptoctree
 ```
 
 # Usage
