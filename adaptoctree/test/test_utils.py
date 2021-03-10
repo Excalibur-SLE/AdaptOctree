@@ -12,7 +12,7 @@ import adaptoctree.utils as utils
 )
 def test_deterministic_hash(arr):
 
-    h1 = utils.deterministic_hash(str(arr))
-    h2 = utils.deterministic_hash(str(arr))
+    h1 = utils.deterministic_hash(arr)
+    h2 = utils.deterministic_hash(arr)
 
     assert h1 == h2

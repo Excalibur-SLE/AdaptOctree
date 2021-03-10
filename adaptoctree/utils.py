@@ -4,10 +4,10 @@ Utility functions
 import hashlib
 
 
-def deterministic_hash(string, digest_size=10):
+def deterministic_hash(array, digest_size=5):
     """
-    Compute a simple deterministic hash.
+    Compute a simple deterministic hash of an array
     """
     h = hashlib.blake2b(digest_size=digest_size)
-    h.update(string.encode())
+    h.update(array.tobytes())
     return int(h.hexdigest(), 16)
