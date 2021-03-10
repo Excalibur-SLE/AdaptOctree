@@ -1,5 +1,7 @@
 <h1 align='center'> AdaptOctree </h1>
 
+[![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/version.svg)](https://anaconda.org/skailasa/adaptoctree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/latest_release_date.svg)](https://anaconda.org/skailasa/adaptoctree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/platforms.svg)](https://anaconda.org/skailasa/adaptoctree)
+
 AdaptOctree is an library to *quickly* **build** and **balance** adaptive linear octrees written in Python, and Python's ample numeric libraries.
 
 Adaptive linear octrees are a data structure useful in a large variety of scientific and numerical codes. AdaptOctree has been designed for use within [PyExaFMM](https://github.com/exafmm/pyexafmm), a Pythonic Kernel Independent Fast Multipole Method implementation. However, it is quite happy to work on its own too.
