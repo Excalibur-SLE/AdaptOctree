@@ -1,6 +1,6 @@
 <h1 align='center'> AdaptOctree </h1>
 
-[![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/version.svg)](https://anaconda.org/skailasa/adaptoctree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/latest_release_date.svg)](https://anaconda.org/skailasa/adaptoctree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/platforms.svg)](https://anaconda.org/skailasa/adaptoctree)
+[![Anaconda-Server Badge](https://img.shields.io/conda/v/skailasa/adaptoctree.svg)](https://anaconda.org/skailasa/adaptoctree)  [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/latest_release_date.svg)](https://anaconda.org/skailasa/adaptoctree) [![Anaconda-Server Badge](https://anaconda.org/skailasa/adaptoctree/badges/platforms.svg)](https://anaconda.org/skailasa/adaptoctree)
 
 AdaptOctree is an library to *quickly* **build** and **balance** adaptive linear octrees written in Python, and Python's ample numeric libraries.
 
