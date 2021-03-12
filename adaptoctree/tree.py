@@ -617,7 +617,7 @@ def find_vertices(x0, r0):
     ])
 
 
-def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
+def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=5):
     """
     Find the unique V list interactions for a given level of the octree.
         There are at most 316 = 7^3-3^3 such interactions in the non-adaptive
@@ -639,7 +639,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=10):
     depth : np.int64
         Depth of the octree.
     digest_size : np.int64
-        Size of hashed digest, default 10.
+        Size of hashed digest, default 5.
 
     Returns:
     --------
