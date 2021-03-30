@@ -256,7 +256,7 @@ def test_find_parent(key, expected):
     "key, x0, r0, expected",
     [
         (
-            0, np.array([1, 1, 1]), 1, np.array([[0, 0, 0], [2, 2, 2]])
+            0, np.array([1, 1, 1], dtype=np.float64), 1., np.array([[0, 0, 0], [2, 2, 2]])
         )
     ]
 )
