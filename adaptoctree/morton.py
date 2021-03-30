@@ -914,10 +914,7 @@ def find_physical_center_from_anchor(anchor, x0, r0):
     return (anchor[:3] + 0.5) * side_length + xmin
 
 
-@numba.njit(
-    [types.Coord(types.Key, types.Coord, types.Double)],
-    cache=True
-)
+@numba.njit(cache=True)
 def find_physical_center_from_key(key, x0, r0):
     """
     Find the center of a given Octree node from it's Morton key.
