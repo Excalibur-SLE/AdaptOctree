@@ -9,7 +9,7 @@ import numpy as np
 
 def deterministic_hash(array, digest_size=5):
     """
-    Compute a simple deterministic hash of an array
+    Compute a simple deterministic hash of a general array.
     """
     h = hashlib.blake2b(digest_size=digest_size)
     h.update(array.tobytes())
@@ -19,8 +19,7 @@ def deterministic_hash(array, digest_size=5):
 @numba.njit(cache=True)
 def deterministic_checksum(coord, digest_size=5):
     """
-    Compute a simpler deterministic hash of a 3D coordinate, that importantly
-        can be jitted.
+    Compute a simple deterministic checksum of a 3D (integer) coordinate array.
     """
     hash = 0
 
