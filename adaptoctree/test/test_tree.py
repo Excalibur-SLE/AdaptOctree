@@ -198,3 +198,6 @@ def test_find_unique_v_list_interactions(x0, r0, depth, expected):
     # Test that the v list is dense
     v, t, h = tree.find_unique_v_list_interactions(depth, x0, r0, depth)
     assert len(v) == expected
+
+    # Test that the hash function works as expected
+    assert len(np.unique(h)) == 316

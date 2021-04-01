@@ -16,3 +16,17 @@ def test_deterministic_hash(arr):
     h2 = utils.deterministic_hash(arr)
 
     assert h1 == h2
+
+
+@pytest.mark.parametrize(
+    'arr',
+    [
+        (np.array([0.5, 0.5, 0.5]))
+    ]
+)
+def test_simple_hash(arr):
+
+    h1 = utils.simple_hash(arr)
+    h2 = utils.simple_hash(arr)
+
+    assert h1 == h2
