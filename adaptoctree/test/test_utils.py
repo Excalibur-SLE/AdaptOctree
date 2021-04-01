@@ -24,9 +24,9 @@ def test_deterministic_hash(arr):
         (np.array([0.5, 0.5, 0.5]))
     ]
 )
-def test_simple_hash(arr):
+def test_deterministic_checksum(arr):
 
-    h1 = utils.simple_hash(arr)
-    h2 = utils.simple_hash(arr)
+    h1 = utils.deterministic_checksum(arr)
+    h2 = utils.deterministic_checksum(arr)
 
     assert h1 == h2

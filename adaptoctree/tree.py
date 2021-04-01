@@ -678,7 +678,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=5):
 
         transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
         hashed_transfer_vectors.extend(
-            [utils.simple_hash(vec, digest_size) for vec in transfer_vectors]
+            [utils.deterministic_checksum(vec, digest_size) for vec in transfer_vectors]
         )
 
     targets = np.array(targets).ravel()

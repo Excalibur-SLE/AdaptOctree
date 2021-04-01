@@ -17,7 +17,7 @@ def deterministic_hash(array, digest_size=5):
 
 
 @numba.njit(cache=True)
-def simple_hash(coord, digest_size=5):
+def deterministic_checksum(coord, digest_size=5):
     """
     Compute a simpler deterministic hash of a 3D coordinate, that importantly
         can be jitted.
