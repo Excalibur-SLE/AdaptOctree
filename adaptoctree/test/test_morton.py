@@ -262,7 +262,6 @@ def test_find_parent(key, expected):
 )
 def test_find_node_bounds(key, x0, r0, expected):
     result = morton.find_node_bounds(key, x0, r0)
-
     assert np.array_equal(result, expected)
 
 
