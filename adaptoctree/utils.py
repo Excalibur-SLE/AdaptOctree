@@ -25,7 +25,7 @@ def deterministic_checksum(coord):
 
     for i in coord:
         if i < 0:
-            hash |= np.int16(-(2*i)+1)
+            hash |= np.int16((2*(-i)+1))
         else:
             hash |= np.int16(2*i)
 
