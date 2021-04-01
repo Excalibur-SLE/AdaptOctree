@@ -617,7 +617,7 @@ def find_vertices(x0, r0):
     ])
 
 
-def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=5):
+def find_unique_v_list_interactions(level, x0, r0, depth):
     """
     Find the unique V list interactions for a given level of the octree.
         There are at most 316 = 7^3-3^3 such interactions in the non-adaptive
@@ -678,7 +678,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth, digest_size=5):
 
         transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
         hashed_transfer_vectors.extend(
-            [utils.deterministic_checksum(vec, digest_size) for vec in transfer_vectors]
+            [utils.deterministic_checksum(vec) for vec in transfer_vectors]
         )
 
     targets = np.array(targets).ravel()

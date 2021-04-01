@@ -17,7 +17,7 @@ def deterministic_hash(array, digest_size=5):
 
 
 @numba.njit(cache=True)
-def deterministic_checksum(coord, digest_size=5):
+def deterministic_checksum(coord):
     """
     Compute a simple deterministic checksum of a 3D (integer) coordinate array.
     """
