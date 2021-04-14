@@ -645,8 +645,8 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     --------
     (np.array(np.int64), np.array(np.int64), np.array(np.int64))
         Return a triple containing (i) The Morton keys of unique source nodes
-        (ii) Their corresponding target nodes and (iii) an array of blake2b
-        hashes corresponding to their transfer vectors for lookup.
+        (ii) Their corresponding target nodes and (iii) an array of hashes
+        corresponding to their transfer vectors for lookup.
     """
     # Encode the centre, and find it's neighbours
     center = morton.encode_point(x0, level, x0, r0)
