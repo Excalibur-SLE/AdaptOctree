@@ -645,8 +645,8 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     --------
     (np.array(np.int64), np.array(np.int64), np.array(np.int64))
         Return a triple containing (i) The Morton keys of unique source nodes
-        (ii) Their corresponding target nodes and (iii) an array of blake2b
-        hashes corresponding to their transfer vectors for lookup.
+        (ii) Their corresponding target nodes and (iii) an array of hashes
+        corresponding to their transfer vectors for lookup.
     """
     # Encode the centre, and find it's neighbours
     center = morton.encode_point(x0, level, x0, r0)
@@ -664,7 +664,7 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
     neighbours = np.hstack((neighbours, vertices_siblings))
 
     redundant_v_list = []
-    hashed_transfer_vectors = []
+    transfer_vectors = []
 
     targets = []
 
@@ -676,25 +676,23 @@ def find_unique_v_list_interactions(level, x0, r0, depth):
         redundant_v_list.extend(v_list)
         targets.extend(neighbour*np.ones(len(v_list), dtype=np.int64))
 
-        transfer_vectors = morton.find_transfer_vectors(neighbour, v_list, depth)
-        hashed_transfer_vectors.extend(
-            [utils.deterministic_checksum(vec) for vec in transfer_vectors]
-        )
+        res = morton.find_transfer_vectors(neighbour, v_list)
+        transfer_vectors.extend([i for i in res])
 
     targets = np.array(targets).ravel()
     redundant_v_list = np.array(redundant_v_list)
 
     unique_idxs = []
-    unique_transfer_hashes = []
+    unique_transfer_vectors = []
 
     # Compute the unique transfer vectors, in hashed form
-    for i in range(len(hashed_transfer_vectors)):
-        hashed_transfer_vector = hashed_transfer_vectors[i]
+    for i in range(len(transfer_vectors)):
+        transfer_vector = transfer_vectors[i]
 
-        if hashed_transfer_vector not in unique_transfer_hashes:
+        if transfer_vector not in unique_transfer_vectors:
             unique_idxs.append(i)
-            unique_transfer_hashes.append(hashed_transfer_vector)
+            unique_transfer_vectors.append(transfer_vector)
 
-    unique_transfer_hashes = np.array(unique_transfer_hashes)
+    unique_transfer_vectors = np.array(unique_transfer_vectors)
 
-    return redundant_v_list[unique_idxs], targets[unique_idxs], unique_transfer_hashes
+    return redundant_v_list[unique_idxs], targets[unique_idxs], unique_transfer_vectors

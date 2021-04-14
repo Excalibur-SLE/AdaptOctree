@@ -756,54 +756,77 @@ def anchor_to_absolute(anchor, level_diff, scaling_factor):
 
 
 @numba.njit(
-    [types.Coord(types.Key, types.Key, types.Long)],
+    [types.Long(types.Key, types.Key)],
     cache=True
 )
-def find_transfer_vector(a, b, tree_depth):
+def find_transfer_vector(a, b):
     """
-    Find transfer vector between two nodes' Morton keys, with respect to depth
-        of the tree.
+    Find transfer vector between two nodes' Morton keys, and return as a unique
+        checksum.
     """
-    if a in find_ancestors(b) or b in find_ancestors(a):
-        return np.array([0., 0., 0.])
+    ax = ay = az = 0
+    bx = by = bz = 0
 
-    l_a_diff = tree_depth-find_level(a)
-    sf_a = 1 << l_a_diff
+    a = a >> LEVEL_DISPLACEMENT
+    b = b >> LEVEL_DISPLACEMENT
 
-    l_b_diff = tree_depth - find_level(b)
-    sf_b = 1 << l_b_diff
+    def extract(x):
+        """extract every third bit from 24 bit integer"""
+        ans = 0
+        i = 0
+        while x > 0:
+            ans = ans | ((x & 1) << i)
+            i += 1
+            x = x >> 3
+        return ans
 
-    r_a = sf_a*0.5
-    r_b = sf_b*0.5
+    ax = extract(a)
+    ax =  ax | (extract((a >> 24)) << BYTE_DISPLACEMENT)
 
-    anchor_a = decode_key(a)
-    anchor_b = decode_key(b)
+    ay = extract(a >> 1)
+    ay = ay | (extract((a >> 25)) << BYTE_DISPLACEMENT)
 
-    a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
-    b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
+    az = extract(a >> 2)
+    az = az | (extract((a >> 26)) << BYTE_DISPLACEMENT)
 
-    c_a = a + r_a
-    c_b = b + r_b
+    bx = extract(b)
+    bx =  bx | (extract((b >> 24)) << BYTE_DISPLACEMENT)
 
-    return c_b-c_a
+    by = extract(b >> 1)
+    by = by | (extract((b >> 25)) << BYTE_DISPLACEMENT)
+
+    bz = extract(b >> 2)
+    bz = bz | (extract((b >> 26)) << BYTE_DISPLACEMENT)
+
+    # Find transfer vector components
+    x = ax-bx
+    y = ay-by
+    z = az-bz
+
+    # Map all to positive reals so can concatenate into a unique checksum
+    x = (2*(-x))+1 if x < 0 else 2*x
+    y = (2*(-y))+1 if y < 0 else 2*y
+    z = (2*(-z))+1 if z < 0 else 2*z
+
+    checksum = x
+    checksum = (checksum << 16) | y
+    checksum = (checksum << 16) | z
+
+    return checksum
 
 
-@numba.njit(
-    [types.Coords(types.Key, types.Keys, types.Long)],
-    cache=True
-)
-def find_transfer_vectors(a, b_array, tree_depth):
+@numba.njit(cache=True)
+def find_transfer_vectors(a, b_array):
     """
     Find transfer vectors between a node, and a vector of other nodes' Morton
-        keys with respect to tree depth.
+        keys.
     """
-    result = np.zeros(shape=(len(b_array), 3), dtype=np.float64)
+    nb = len(b_array)
+    res = np.zeros(nb, np.int64)
+    for i in range(nb):
+        res[i] = find_transfer_vector(a, b_array[i])
 
-    for i in range(len(b_array)):
-        b = b_array[i]
-        result[i, :] = find_transfer_vector(a, b, tree_depth)
-
-    return result
+    return res
 
 
 @numba.njit(
