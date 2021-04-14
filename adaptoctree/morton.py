@@ -755,66 +755,17 @@ def anchor_to_absolute(anchor, level_diff, scaling_factor):
     return anchor[:3]*scaling_factor
 
 
-# @numba.njit(
-#     [types.Coord(types.Key, types.Key, types.Long)],
-#     cache=True
-# )
-# def find_transfer_vector(a, b, tree_depth):
-#     """
-#     Find transfer vector between two nodes' Morton keys, with respect to depth
-#         of the tree.
-#     """
-#     if a in find_ancestors(b) or b in find_ancestors(a):
-#         return np.array([0., 0., 0.])
-
-#     l_a_diff = tree_depth-find_level(a)
-#     sf_a = 1 << l_a_diff
-
-#     l_b_diff = tree_depth - find_level(b)
-#     sf_b = 1 << l_b_diff
-
-#     r_a = sf_a*0.5
-#     r_b = sf_b*0.5
-
-#     anchor_a = decode_key(a)
-#     anchor_b = decode_key(b)
-
-#     a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
-#     b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
-
-#     c_a = a + r_a
-#     c_b = b + r_b
-
-#     return c_b-c_a
-
-
-# @numba.njit(
-#     [types.Coords(types.Key, types.Keys, types.Long)],
-#     cache=True
-# )
-# def find_transfer_vectors(a, b_array, tree_depth):
-#     """
-#     Find transfer vectors between a node, and a vector of other nodes' Morton
-#         keys with respect to tree depth.
-#     """
-#     result = np.zeros(shape=(len(b_array), 3), dtype=np.float64)
-
-#     for i in range(len(b_array)):
-#         b = b_array[i]
-#         result[i, :] = find_transfer_vector(a, b, tree_depth)
-
-#     return result
-
-
-@numba.njit(cache=True)
+@numba.njit(
+    [types.Long(types.Key, types.Key)],
+    cache=True
+)
 def find_transfer_vector(a, b):
-
-    ax = 0
-    ay = 0
-    az = 0
-    bx = 0
-    by = 0
-    bz = 0
+    """
+    Find transfer vector between two nodes' Morton keys, and return as a unique
+        checksum.
+    """
+    ax = ay = az = 0
+    bx = by = bz = 0
 
     a = a >> LEVEL_DISPLACEMENT
     b = b >> LEVEL_DISPLACEMENT
@@ -847,35 +798,29 @@ def find_transfer_vector(a, b):
     bz = extract(b >> 2)
     bz = bz | (extract((b >> 26)) << BYTE_DISPLACEMENT)
 
-    # Diff
+    # Find transfer vector components
     x = ax-bx
     y = ay-by
     z = az-bz
 
-    # Map to positive reals
-    if x < 0:
-        x = (2*(-x))+1
-    else:
-        x = 2*x
-    if y < 0:
-        y = (2*(-y))+1
-    else:
-        y = 2*y
-    if z < 0:
-        z = (2*(-z))+1
-    else:
-        z = 2*z
+    # Map all to positive reals so can concatenate into a unique checksum
+    x = (2*(-x))+1 if x < 0 else 2*x
+    y = (2*(-y))+1 if y < 0 else 2*y
+    z = (2*(-z))+1 if z < 0 else 2*z
 
-    res = x
-    res = (res << 16) | y
-    res = (res << 16) | z
+    checksum = x
+    checksum = (checksum << 16) | y
+    checksum = (checksum << 16) | z
 
-    return res
+    return checksum
 
 
 @numba.njit(cache=True)
 def find_transfer_vectors(a, b_array):
-
+    """
+    Find transfer vectors between a node, and a vector of other nodes' Morton
+        keys.
+    """
     nb = len(b_array)
     res = np.zeros(nb, np.int64)
     for i in range(nb):
