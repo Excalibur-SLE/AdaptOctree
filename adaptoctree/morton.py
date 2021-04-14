@@ -755,55 +755,133 @@ def anchor_to_absolute(anchor, level_diff, scaling_factor):
     return anchor[:3]*scaling_factor
 
 
-@numba.njit(
-    [types.Coord(types.Key, types.Key, types.Long)],
-    cache=True
-)
-def find_transfer_vector(a, b, tree_depth):
-    """
-    Find transfer vector between two nodes' Morton keys, with respect to depth
-        of the tree.
-    """
-    if a in find_ancestors(b) or b in find_ancestors(a):
-        return np.array([0., 0., 0.])
+# @numba.njit(
+#     [types.Coord(types.Key, types.Key, types.Long)],
+#     cache=True
+# )
+# def find_transfer_vector(a, b, tree_depth):
+#     """
+#     Find transfer vector between two nodes' Morton keys, with respect to depth
+#         of the tree.
+#     """
+#     if a in find_ancestors(b) or b in find_ancestors(a):
+#         return np.array([0., 0., 0.])
 
-    l_a_diff = tree_depth-find_level(a)
-    sf_a = 1 << l_a_diff
+#     l_a_diff = tree_depth-find_level(a)
+#     sf_a = 1 << l_a_diff
 
-    l_b_diff = tree_depth - find_level(b)
-    sf_b = 1 << l_b_diff
+#     l_b_diff = tree_depth - find_level(b)
+#     sf_b = 1 << l_b_diff
 
-    r_a = sf_a*0.5
-    r_b = sf_b*0.5
+#     r_a = sf_a*0.5
+#     r_b = sf_b*0.5
 
-    anchor_a = decode_key(a)
-    anchor_b = decode_key(b)
+#     anchor_a = decode_key(a)
+#     anchor_b = decode_key(b)
 
-    a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
-    b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
+#     a = anchor_to_absolute(anchor_a, l_a_diff, sf_a)
+#     b = anchor_to_absolute(anchor_b, l_b_diff, sf_b)
 
-    c_a = a + r_a
-    c_b = b + r_b
+#     c_a = a + r_a
+#     c_b = b + r_b
 
-    return c_b-c_a
+#     return c_b-c_a
 
 
-@numba.njit(
-    [types.Coords(types.Key, types.Keys, types.Long)],
-    cache=True
-)
-def find_transfer_vectors(a, b_array, tree_depth):
-    """
-    Find transfer vectors between a node, and a vector of other nodes' Morton
-        keys with respect to tree depth.
-    """
-    result = np.zeros(shape=(len(b_array), 3), dtype=np.float64)
+# @numba.njit(
+#     [types.Coords(types.Key, types.Keys, types.Long)],
+#     cache=True
+# )
+# def find_transfer_vectors(a, b_array, tree_depth):
+#     """
+#     Find transfer vectors between a node, and a vector of other nodes' Morton
+#         keys with respect to tree depth.
+#     """
+#     result = np.zeros(shape=(len(b_array), 3), dtype=np.float64)
 
-    for i in range(len(b_array)):
-        b = b_array[i]
-        result[i, :] = find_transfer_vector(a, b, tree_depth)
+#     for i in range(len(b_array)):
+#         b = b_array[i]
+#         result[i, :] = find_transfer_vector(a, b, tree_depth)
 
-    return result
+#     return result
+
+
+@numba.njit(cache=True)
+def find_transfer_vector(a, b):
+
+    ax = 0
+    ay = 0
+    az = 0
+    bx = 0
+    by = 0
+    bz = 0
+
+    a = a >> LEVEL_DISPLACEMENT
+    b = b >> LEVEL_DISPLACEMENT
+
+    def extract(x):
+        """extract every third bit from 24 bit integer"""
+        ans = 0
+        i = 0
+        while x > 0:
+            ans = ans | ((x & 1) << i)
+            i += 1
+            x = x >> 3
+        return ans
+
+    ax = extract(a)
+    ax =  ax | (extract((a >> 24)) << BYTE_DISPLACEMENT)
+
+    ay = extract(a >> 1)
+    ay = ay | (extract((a >> 25)) << BYTE_DISPLACEMENT)
+
+    az = extract(a >> 2)
+    az = az | (extract((a >> 26)) << BYTE_DISPLACEMENT)
+
+    bx = extract(b)
+    bx =  bx | (extract((b >> 24)) << BYTE_DISPLACEMENT)
+
+    by = extract(b >> 1)
+    by = by | (extract((b >> 25)) << BYTE_DISPLACEMENT)
+
+    bz = extract(b >> 2)
+    bz = bz | (extract((b >> 26)) << BYTE_DISPLACEMENT)
+
+    # Diff
+    x = ax-bx
+    y = ay-by
+    z = az-bz
+
+    # Map to positive reals
+    if x < 0:
+        x = (2*(-x))+1
+    else:
+        x = 2*x
+    if y < 0:
+        y = (2*(-y))+1
+    else:
+        y = 2*y
+    if z < 0:
+        z = (2*(-z))+1
+    else:
+        z = 2*z
+
+    res = x
+    res = (res << 16) | y
+    res = (res << 16) | z
+
+    return res
+
+
+@numba.njit(cache=True)
+def find_transfer_vectors(a, b_array):
+
+    nb = len(b_array)
+    res = np.zeros(nb, np.int64)
+    for i in range(nb):
+        res[i] = find_transfer_vector(a, b_array[i])
+
+    return res
 
 
 @numba.njit(

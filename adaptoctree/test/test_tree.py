@@ -199,5 +199,5 @@ def test_find_unique_v_list_interactions(x0, r0, depth, expected):
     v, t, h = tree.find_unique_v_list_interactions(depth, x0, r0, depth)
     assert len(v) == expected
 
-    # Test that the checksum function works as expected
+    # Test that the transfer vectors are uniquely indexed
     assert len(np.unique(h)) == 316
