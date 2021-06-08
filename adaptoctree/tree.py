@@ -403,7 +403,7 @@ def find_interaction_lists(leaves, complete, depth):
             return len(adjacent), adjacent, len(not_adjacent), not_adjacent
 
         def build_current_level_leaf(
-                key, leaves_set, colleagues, parent_colleagues_children, depth
+                key, leaves_set, complete_set, colleagues, parent_colleagues_children, depth
             ):
             """
             Build the portion of the interaction list that is expected at the
@@ -442,7 +442,7 @@ def find_interaction_lists(leaves, complete, depth):
             pcc_in_tree = np.zeros_like(parent_colleagues_children)
             i = 0
             for pcc in parent_colleagues_children:
-                if pcc in leaves_set:
+                if pcc in complete_set:
                     pcc_in_tree[i] = pcc
                     i += 1
 
@@ -551,7 +551,7 @@ def find_interaction_lists(leaves, complete, depth):
             x[i][x_ptr:px_ptr] = pnadj
 
             cu_ptr, cadj, pcc_ptr, pcc_nadj = build_current_level_leaf(
-                key, leaves_set, colleagues, parent_colleagues_children, depth
+                key, leaves_set, complete_set, colleagues, parent_colleagues_children, depth
             )
             u[i][u_ptr:u_ptr+cu_ptr] = cadj
             u_ptr = pu_ptr+cu_ptr
