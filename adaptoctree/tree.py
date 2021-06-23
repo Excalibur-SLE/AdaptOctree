@@ -95,13 +95,35 @@ def build_helper(
         level += 1
 
 
+def build_uniform(points, start_level, max_points):
+    """
+    Build a uniform octree, that satisfies the constraint of at most 'max_points'
+        per node.
+    """
+    max_bound, min_bound = morton.find_bounds(points)
+    x0 = morton.find_center(max_bound, min_bound)
+    r0 = morton.find_radius(x0, max_bound, min_bound)
+
+    level = start_level
+
+    built = False
+    while not built:
+        keys = morton.encode_points_smt(points, level, x0, r0)
+        _, counts = np.unique(keys, return_counts=True)
+        if np.any(counts <= max_points):
+            built = True
+        level += 1
+
+    return morton.find_descendents(0, level)
+
+
 @numba.njit(
     [types.Keys(types.Coords, types.Long, types.Long, types.Long)],
     parallel=True, cache=True
 )
 def build(points, max_level, max_points, start_level):
     """
-    Build an unbalanced linear Morton encoded octree, that satisfied a the
+    Build an unbalanced linear Morton encoded octree, that satisfies the
         constraint of at most 'max_points' points per node.
     """
 
