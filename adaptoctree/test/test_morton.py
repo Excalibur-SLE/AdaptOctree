@@ -109,19 +109,18 @@ def test_find_bounds(points, expected_max_bound, expected_min_bound):
 
 
 @pytest.mark.parametrize(
-    "center, max_bound, min_bound, expected",
+    "max_bound, min_bound, expected",
     [
         (
-            np.array([1, 1, 1], dtype=np.float64),
             np.array([2, 2, 2], dtype=np.float64),
             np.array([0, 0, 0], dtype=np.float64),
-            np.float64(1+1e-10)
+            np.float64(1+1e-3)
         )
     ]
 )
-def test_find_radius(center, max_bound, min_bound, expected):
+def test_find_radius(max_bound, min_bound, expected):
 
-    result = morton.find_radius(center, max_bound, min_bound)
+    result = morton.find_radius(max_bound, min_bound)
     assert result == expected
 
 
