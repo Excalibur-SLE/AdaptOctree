@@ -126,9 +126,8 @@ def point_to_anchor(point, level, x0, r0):
     anchor[3] = level
 
     displacement = x0 - r0
-    origin = np.array([0, 0, 0], np.float64)+displacement
     side_length = 2 * r0 / (1 << level)
-    anchor[:3] = np.floor((point - origin) / side_length).astype(np.int64)
+    anchor[:3] = np.floor((point - displacement) / side_length).astype(np.int64)
 
     return anchor
 
