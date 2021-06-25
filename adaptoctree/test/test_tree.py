@@ -46,9 +46,9 @@ def octree_center(points):
 
 
 @pytest.fixture
-def octree_radius(octree_center, points):
+def octree_radius(points):
     min_bound, max_bound = morton.find_bounds(points)
-    return morton.find_radius(octree_center, max_bound, min_bound)
+    return morton.find_radius(max_bound, min_bound)
 
 
 @pytest.fixture

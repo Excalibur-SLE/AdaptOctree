@@ -102,7 +102,7 @@ def build_uniform(points, start_level, max_points):
     """
     max_bound, min_bound = morton.find_bounds(points)
     x0 = morton.find_center(max_bound, min_bound)
-    r0 = morton.find_radius(x0, max_bound, min_bound)
+    r0 = morton.find_radius(max_bound, min_bound)
 
     level = start_level
 
@@ -129,7 +129,7 @@ def build(points, max_level, max_points, start_level):
 
     max_bound, min_bound = morton.find_bounds(points)
     x0 = morton.find_center(max_bound, min_bound)
-    r0 = morton.find_radius(x0, max_bound, min_bound)
+    r0 = morton.find_radius(max_bound, min_bound)
 
     keys = morton.encode_points_smt(points, start_level, x0, r0)
     unique_keys = np.unique(keys)
@@ -281,7 +281,8 @@ def _complete_tree(leaves):
     tree_set = set(leaves)
 
     for leaf in leaves:
-        tree_set.update(morton.find_ancestors(leaf))
+        ancestors = morton.find_ancestors(leaf)
+        tree_set.update(ancestors)
 
     return tree_set
 

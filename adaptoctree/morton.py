@@ -100,23 +100,18 @@ def find_center(max_bound, min_bound):
     """
     Find center of an Octree domain described by a minimum and maximum bound.
     """
-    center = (min_bound + max_bound) / 2
-    return center
+    return (min_bound + max_bound) / 2
 
 
 @numba.njit(
-    [types.Double(types.Coord, types.Coord, types.Coord)],
+    [types.Double(types.Coord, types.Coord)],
     cache=True
 )
-def find_radius(center, max_bound, min_bound):
+def find_radius(max_bound, min_bound):
     """
     Find the half side length `radius' of an Octree's root node.
     """
-    rad1 = np.max(center - min_bound)
-    rad2 = np.max(max_bound - center)
-    vals = np.array([rad1, rad2])
-    radius = np.max(vals) * (1 + 1e-10)
-    return abs(radius)
+    return np.max((max_bound-min_bound)/2)+1e-3
 
 
 @numba.njit(
@@ -130,10 +125,10 @@ def point_to_anchor(point, level, x0, r0):
     anchor = np.empty(4, dtype=np.int64)
     anchor[3] = level
 
-    xmin = x0 - r0
-
+    displacement = x0 - r0
+    origin = np.array([0, 0, 0], np.float64)+displacement
     side_length = 2 * r0 / (1 << level)
-    anchor[:3] = np.floor((point - xmin) / side_length).astype(np.int64)
+    anchor[:3] = np.floor((point - origin) / side_length).astype(np.int64)
 
     return anchor
 
@@ -193,20 +188,15 @@ def encode_points(points, level, x0, r0):
     """
     Apply morton encoding to a set of points.
     """
-
-    npoints, _ = points.shape
+    npoints = len(points)
     keys = np.empty(npoints, dtype=np.int64)
+    anchors = []
 
-    anchors = np.empty((npoints, 4), dtype=np.int64)
-    anchors[:, 3] = level
+    for point in points:
+        anchors.append(point_to_anchor(point, level, x0, r0))
 
-    xmin = x0 - r0
-    diameter = 2 * r0 / (1 << level)
-
-    anchors[:, :3] = np.floor((points - xmin) / diameter).astype(np.int64)
-
-    for i in range(npoints):
-        keys[i] = encode_anchor(anchors[i, :])
+    for i, anchor in enumerate(anchors):
+        keys[i] = encode_anchor(anchor)
 
     return keys
 
@@ -220,19 +210,15 @@ def encode_points_smt(points, level, x0, r0):
     Apply morton encoding to a set of points, using multi-threading.
     """
 
-    npoints, _ = points.shape
+    npoints = len(points)
     keys = np.empty(npoints, dtype=np.int64)
+    anchors = []
 
-    anchors = np.empty((npoints, 4), dtype=np.int64)
-    anchors[:, 3] = level
-
-    xmin = x0 - r0
-    diameter = 2 * r0 / (1 << level)
-
-    anchors[:, :3] = np.floor((points - xmin) / diameter).astype(np.int64)
+    for point in points:
+        anchors.append(point_to_anchor(point, level, x0, r0))
 
     for i in numba.prange(npoints):
-        keys[i] = encode_anchor(anchors[i, :])
+        keys[i] = encode_anchor(anchors[i])
 
     return keys
 
