@@ -11,7 +11,7 @@ import adaptoctree.utils as utils
 
 
 @numba.njit(
-    [types.LongIntList(types.LongArray, types.Keys, types.Long)],
+    [types.LongList(types.LongArray, types.Keys, types.Long)],
     cache=True
 )
 def find_work_items(sorted_work_indices, keys, max_points):
@@ -48,7 +48,7 @@ def find_work_items(sorted_work_indices, keys, max_points):
 @numba.njit(
     [
         types.Void(
-            types.Coords, types.Long, types.Long, types.Coord,
+            types.DoubleCoords, types.Long, types.Long, types.DoubleCoord,
             types.Double, types.Keys, types.LongArray, types.Int
         )
     ],
@@ -96,7 +96,7 @@ def build_helper(
 
 
 @numba.njit(
-    [types.Keys(types.Coords, types.Long, types.Long, types.Long)],
+    [types.Keys(types.DoubleCoords, types.Long, types.Long, types.Long)],
     parallel=True, cache=True
 )
 def build(points, max_level, max_points, start_level):
@@ -213,7 +213,7 @@ def balance(tree, depth):
 
 
 @numba.njit(
-    [types.Keys(types.Coords, types.Keys, types.Long, types.Coord, types.Double)],
+    [types.Keys(types.DoubleCoords, types.Keys, types.Long, types.DoubleCoord, types.Double)],
     cache=True
 )
 def points_to_keys(points, tree, depth, x0, r0):
@@ -599,7 +599,7 @@ def find_dense_v_list(key, depth):
 
 
 @numba.jit(
-    [types.Coords(types.Coord, types.Double)],
+    [types.DoubleCoords(types.DoubleCoord, types.Double)],
     cache=True
 )
 def find_vertices(x0, r0):

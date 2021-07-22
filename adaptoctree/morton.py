@@ -14,12 +14,7 @@ to Python's handling of shift operators for unsigned integers.
 import numba
 import numpy as np
 
-from adaptoctree.morton_lookup import (
-    X_LOOKUP_ENCODE, X_LOOKUP_DECODE,
-    Y_LOOKUP_ENCODE, Y_LOOKUP_DECODE,
-    Z_LOOKUP_ENCODE, Z_LOOKUP_DECODE
-)
-
+from adaptoctree.morton_lookup import X_LOOKUP_ENCODE, Y_LOOKUP_ENCODE, Z_LOOKUP_ENCODE
 import adaptoctree.types as types
 
 # Number of bits used for level information
@@ -63,7 +58,7 @@ def find_level(key):
 
 
 @numba.njit(
-    [types.Bounds(types.Coords)],
+    [types.DoubleBounds(types.DoubleCoords)],
     cache=True
 )
 def find_bounds(particles):
@@ -93,7 +88,7 @@ def find_relative_radius(level_diff):
 
 
 @numba.njit(
-    [types.Coord(types.Coord, types.Coord)],
+    [types.DoubleCoord(types.DoubleCoord, types.DoubleCoord)],
     cache=True
 )
 def find_center(max_bound, min_bound):
@@ -104,7 +99,7 @@ def find_center(max_bound, min_bound):
 
 
 @numba.njit(
-    [types.Double(types.Coord, types.Coord)],
+    [types.Double(types.DoubleCoord, types.DoubleCoord)],
     cache=True
 )
 def find_radius(max_bound, min_bound):
@@ -115,7 +110,7 @@ def find_radius(max_bound, min_bound):
 
 
 @numba.njit(
-    [types.Anchor(types.Coord, types.Long, types.Coord, types.Double)],
+    [types.Anchor(types.DoubleCoord, types.Long, types.DoubleCoord, types.Double)],
     cache=True
 )
 def point_to_anchor(point, level, x0, r0):
@@ -168,7 +163,7 @@ def encode_anchor(anchor):
 
 
 @numba.njit(
-    [types.Key(types.Coord, types.Long, types.Coord, types.Double)],
+    [types.Key(types.DoubleCoord, types.Long, types.DoubleCoord, types.Double)],
     cache=True
 )
 def encode_point(point, level, x0, r0):
@@ -180,7 +175,7 @@ def encode_point(point, level, x0, r0):
 
 
 @numba.njit(
-    [types.Keys(types.Coords, types.Long, types.Coord, types.Double)],
+    [types.Keys(types.DoubleCoords, types.Long, types.DoubleCoord, types.Double)],
     cache=True
 )
 def encode_points(points, level, x0, r0):
@@ -201,7 +196,7 @@ def encode_points(points, level, x0, r0):
 
 
 @numba.njit(
-    [types.Keys(types.Coords, types.Long, types.Coord, types.Double)],
+    [types.Keys(types.DoubleCoords, types.Long, types.DoubleCoord, types.Double)],
     parallel=True
 )
 def encode_points_smt(points, level, x0, r0):
@@ -879,7 +874,7 @@ def are_adjacent_vec(key, key_vec, tree_depth):
 
 
 @numba.njit(
-    [types.Coord(types.Anchor, types.Long)],
+    [types.DoubleCoord(types.Anchor, types.Long)],
     cache=True
 )
 def find_relative_center_from_anchor(anchor, depth):
